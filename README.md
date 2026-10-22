@@ -1,6 +1,6 @@
 # CloseCircle
 
-A monorepo for the Android app, backend API, and admin dashboard.
+The CloseCircle project repository contains the Android app, backend API, and admin dashboard.
 
 ## Structure
 
