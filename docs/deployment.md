@@ -122,13 +122,13 @@ On Oct 24, 2026, this logical export/restore procedure was rehearsed with Postgr
 
 ## GitHub Actions deployment
 
-The workflow in `.github/workflows/ci-deploy.yml` runs on pull requests and pushes to `dev` or `main`. It verifies the Maven backend, builds its Docker image, and builds the React dashboard. Pull requests stop after verification. A push deploys the exact commit to both Render services only after verification succeeds, then waits until the public API reports that commit at `/actuator/info` and `/actuator/health` is `UP`, and until the dashboard serves the same commit in non-visible build metadata.
+The workflow in `.github/workflows/ci-deploy.yml` runs on pull requests and pushes to `dev` or `main`. It verifies the Maven backend, builds its Docker image, and builds the React dashboard. Pull requests stop after verification. A push sends the verified GitHub SHA to both Render deploy hooks only after the build checks pass. The workflow waits until the API reports that SHA at `/actuator/info` and `/actuator/health` is `UP`. It then checks that the dashboard serves the CloseCircle welcome page and its JavaScript asset over HTTPS.
 
 Create one Render deploy hook for each service from that service's Settings page. In GitHub, open **Settings → Secrets and variables → Actions** and add these repository secrets:
 
 - `RENDER_API_DEPLOY_HOOK_URL`
-- `RENDER_DASHBOARD_DEPLOY_HOOK_URL`
+- `RENDER_DASHBOARD_DEPLOY_HOOK_URL_CURRENT`
 
 Deploy-hook URLs are credentials that can trigger service deployments. Keep them in GitHub Actions secrets; do not commit or print them. If either secret is missing, the deploy job fails with the missing secret's name. Rotate a hook in Render and update the matching GitHub secret if it is exposed.
 
-The dashboard build injects Render's `RENDER_GIT_COMMIT` into a hidden HTML meta tag. The API's public `/actuator/info` response contains only that commit SHA. Neither endpoint returns credentials or user data. The workflow has a 30-minute cap to accommodate Render Free cold starts and builds; Render Free may still suspend idle services between deployments.
+The dashboard template contains a hidden `closecircle-build` meta tag, but the current Render response retains its Vite placeholder instead of substituting a commit SHA. The workflow therefore does not use that tag as proof; it sends the same verified SHA in the dashboard deploy-hook request and smoke-checks the live page and asset. The API's public `/actuator/info` response contains only Render's Git commit SHA. Neither endpoint returns credentials or user data. The workflow has a 30-minute cap to accommodate Render Free cold starts and builds; Render Free may still suspend idle services between deployments.
