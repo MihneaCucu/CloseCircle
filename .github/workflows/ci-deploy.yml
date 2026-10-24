@@ -82,12 +82,12 @@ jobs:
 
       - name: Trigger dashboard deployment for this commit
         env:
-          DEPLOY_HOOK_URL: ${{ secrets.RENDER_DASHBOARD_DEPLOY_HOOK_URL }}
+          DEPLOY_HOOK_URL: ${{ secrets.RENDER_DASHBOARD_DEPLOY_HOOK_URL_CURRENT }}
           DEPLOY_REF: ${{ github.sha }}
         run: |
           set -euo pipefail
           if [ -z "$DEPLOY_HOOK_URL" ]; then
-            echo "Missing GitHub Actions secret RENDER_DASHBOARD_DEPLOY_HOOK_URL" >&2
+            echo "Missing GitHub Actions secret RENDER_DASHBOARD_DEPLOY_HOOK_URL_CURRENT" >&2
             exit 1
           fi
           case "$DEPLOY_HOOK_URL" in
