@@ -47,3 +47,7 @@ CloseCircle/
 | Backend | Java, Spring Boot, Docker | REST API, JWT authentication, and application logic |
 | Database | PostgreSQL on Neon | Persistent storage for shared data |
 | Admin dashboard | React, TypeScript | Administration, map, and simulator control |
+
+## Initial infrastructure
+
+See [the deployment guide](docs/deployment.md) for local startup, Neon and Render setup, secrets, backup and restore steps, and Free-plan limits. The initial Render Blueprint is `render.yaml`; the dashboard is only an infrastructure landing page until T-25. The REST contract is tracked separately in [docs/api-contract.md](docs/api-contract.md).

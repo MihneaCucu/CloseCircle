@@ -3,6 +3,8 @@
 .env.*
 !.env.example
 local.properties
+*.dump
+*.sql.gz
 
 # Java and Gradle
 **/target/
@@ -17,3 +19,5 @@ local.properties
 
 # macOS
 .DS_Store
+.neon
+node_modules/
