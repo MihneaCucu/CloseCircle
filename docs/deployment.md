@@ -78,7 +78,7 @@ For local dashboard health checks, add the exact local dashboard origin to `CORS
 
 ## Schema and persistence smoke check
 
-After the first API deploy, confirm `/actuator/health` is `UP`, and check the Render startup log for Flyway migration `V1` success. To verify an actual write/read on the published database, connect with an authorized `psql` client using the same Neon database, but do not put the password in shell history. Create a disposable sentinel using a test email, query it back, and delete it after the check:
+After the API deploy, confirm `/actuator/health` is `UP`, and check the Render startup log for Flyway migration `V1` success. To verify an actual write/read on the published database, connect with an authorized `psql` client using the same Neon database, but do not put the password in shell history. Create a disposable sentinel using a test email, query it back, restart or redeploy the API, query it again, and delete it after the check:
 
 ```sql
 INSERT INTO users (email, password_hash, display_name)
@@ -90,7 +90,9 @@ FROM users
 WHERE email = 'infra-smoke@example.invalid';
 ```
 
-Then restart/redeploy the API, repeat the `SELECT` to confirm the row persisted in Neon, and clean it up with `DELETE FROM users WHERE email = 'infra-smoke@example.invalid';`. This repository does not include production account access, so that published-environment check must be recorded after the first deployment; it has not been run by this change.
+On Oct 24, 2026, the public API was deployed at `https://closecircle-api.onrender.com` and `/actuator/health` returned `UP` after the Free instance woke. The public database reported Flyway version `1`. A committed synthetic user was inserted and read back, the API service was restarted, and the row was read again from Neon. The test row was deleted afterward. An earlier transaction-only write/read was rolled back. After rotating the Neon password, the new pooled and direct URLs were saved in Render; the API returned `UP` and the committed write/read still passed across a Render restart.
+
+The dashboard is published at `https://closecircle-dashboard.onrender.com` and returned HTTP 200. An OPTIONS preflight from that exact origin returned HTTP 200 with `Access-Control-Allow-Origin: https://closecircle-dashboard.onrender.com`.
 
 ## Export and restore rehearsal
 
@@ -108,7 +110,7 @@ psql "$NEON_RESTORE_DATABASE_URL" -c \
   'SELECT count(*) FROM users;'
 ```
 
-This procedure is documented but still requires a real Neon project and synthetic records for a completed rehearsal. A Neon branch/PITR restore and a logical `pg_dump` archive serve different recovery needs; this task records a logical export/restore workflow. Confirm current retention and restore windows in the Neon console before relying on them.
+On Oct 24, 2026, this logical export/restore procedure was rehearsed with PostgreSQL client tools 18.6. The source database had no application rows at export time. A separate Neon database named `closecircle_restore_test_20261024` received only a synthetic user, a custom-format dump was created outside the repository, and `pg_restore --clean --if-exists --no-owner --no-acl` restored it. Verification found Flyway migration V1 and the synthetic user in the restored database. The source synthetic user and temporary restore database were removed afterward. The temporary dump was deleted and is not a backup artifact for ongoing recovery. A Neon branch/PITR restore and a logical `pg_dump` archive serve different recovery needs; confirm current retention and restore windows in the Neon console before relying on them.
 
 ## Logs, secrets, and recovery
 
