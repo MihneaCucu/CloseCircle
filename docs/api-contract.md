@@ -14,6 +14,7 @@
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
 | `GET` | `/actuator/health` | Public, status only | Render startup and service health check; does not expose component details. |
+| `GET` | `/actuator/info` | Public, commit SHA only | CI deployment check; reports the Render Git commit serving the API. |
 
 ## Location representation
 

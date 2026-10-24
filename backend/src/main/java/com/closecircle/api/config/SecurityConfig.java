@@ -30,7 +30,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
                 .build();
@@ -64,6 +64,7 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/api/**", cors);
         source.registerCorsConfiguration("/actuator/health", cors);
         source.registerCorsConfiguration("/actuator/health/**", cors);
+        source.registerCorsConfiguration("/actuator/info", cors);
         return source;
     }
 }

@@ -11,10 +11,10 @@ Android (SQLite) ── HTTPS REST ──> Spring Boot API (Render Docker Web Se
                                      PostgreSQL (Neon)
 
 React dashboard / local simulator ── HTTPS + authenticated API (functional tasks)
-React baseline ── HTTPS GET /actuator/health (this task)
+React baseline ── HTTPS GET /actuator/health (silent infrastructure check)
 ```
 
-SQLite is client-side/offline storage, not a shared source of truth. Shared application data persists in Neon across API restarts and redeploys. The current baseline only serves the health endpoint; future business routes are protected by stateless JWT Bearer validation (HS256, issuer `closecircle`) but routes, token issuance, and authorization claims are functional work. Never put a database credential or JWT signing secret in the React build, Android app, Docker image, logs, or Git.
+SQLite is client-side/offline storage, not a shared source of truth. Shared application data persists in Neon across API restarts and redeploys. The current baseline serves a public health endpoint and a public commit-info endpoint for deployment verification; future business routes are protected by stateless JWT Bearer validation (HS256, issuer `closecircle`) but routes, token issuance, and authorization claims are functional work. Never put a database credential or JWT signing secret in the React build, Android app, Docker image, logs, or Git.
 
 ## Create the Neon database
 
@@ -73,8 +73,8 @@ For local dashboard health checks, add the exact local dashboard origin to `CORS
 1. Push this repository to GitHub and connect it to Render. Create a Blueprint from the root `render.yaml`, or create the services manually from that file's settings.
 2. The API builds from `backend/Dockerfile` using a Maven build stage and a small Java runtime stage. It listens on Render's `PORT` (default 10000) and limits JVM heap sizing with `MaxRAMPercentage=70` and Serial GC for the Free instance memory budget.
 3. Set the prompted backend values in Render's environment settings: `DATABASE_URL` (Neon's pooled URL), `DATABASE_URL_UNPOOLED` (direct URL for Flyway), `JWT_SECRET`, and `CORS_ALLOWED_ORIGINS`. For the last value, use the exact HTTPS origin of the deployed Static Site, without a path or trailing slash. If the static site's final hostname is not known during Blueprint setup, update `CORS_ALLOWED_ORIGINS` in the backend service settings after creation. Blueprint `sync: false` values are only prompted on initial creation; manage later changes directly in Render. `JWT_SECRET` should be a randomly generated secret with at least 32 bytes; rotate it through Render if exposed. The API validates HS256 Bearer tokens signed with this key and issuer `closecircle`; token issuance is future functional work.
-4. Set the dashboard's `VITE_API_BASE_URL` to the API's HTTPS `onrender.com` base URL. It is a public URL, not a secret. The page calls `/actuator/health` and reports whether the API responds. Do not add database or JWT values to dashboard environment variables.
-5. Render assigns HTTPS URLs and certificates. `/actuator/health` is the API health path. The root `render.yaml` disables automatic deploys so the T-26 / SCRUM-34 workflow can deploy only a verified commit. Until that workflow exists, deploy manually from Render after reviewing the commit.
+4. Set the dashboard's `VITE_API_BASE_URL` to the API's HTTPS `onrender.com` base URL. It is a public URL, not a secret. The landing page makes a silent `/actuator/health` request and keeps infrastructure status out of the visible copy. Do not add database or JWT values to dashboard environment variables.
+5. Render assigns HTTPS URLs and certificates. `/actuator/health` is the API health path. `/actuator/info` exposes only the serving Git commit SHA so CI can confirm the exact deployment. The root `render.yaml` disables Render auto-deploys; `.github/workflows/ci-deploy.yml` runs verification first, then uses both service deploy hooks to deploy that exact commit.
 
 ## Schema and persistence smoke check
 
@@ -120,6 +120,15 @@ On Oct 24, 2026, this logical export/restore procedure was rehearsed with Postgr
 - Neon Free limits can change. As of Oct 24, 2026, Neon documents 100 CU-hours and 1 GB database storage per Free project; monitor current project quotas, egress, compute use, and restore window in the console. Neon can scale idle compute to zero, adding connection/startup delay.
 - This small API uses synchronous request processing only. Do not assume scheduled or continuous background work will run reliably on Render Free.
 
-## T-26 / SCRUM-34 automation handoff
+## GitHub Actions deployment
 
-The root Blueprint has `autoDeploy: false` for both Render services so a later GitHub Actions workflow can test/build a commit, trigger the matching Render deploy hook only after success, then poll `/actuator/health` and fail the workflow on a bad status. Store deploy-hook URLs and any service credentials as GitHub Actions secrets. The workflow itself belongs in T-26 and is intentionally not implemented here.
+The workflow in `.github/workflows/ci-deploy.yml` runs on pull requests and pushes to `dev` or `main`. It verifies the Maven backend, builds its Docker image, and builds the React dashboard. Pull requests stop after verification. A push deploys the exact commit to both Render services only after verification succeeds, then waits until the public API reports that commit at `/actuator/info` and `/actuator/health` is `UP`, and until the dashboard serves the same commit in non-visible build metadata.
+
+Create one Render deploy hook for each service from that service's Settings page. In GitHub, open **Settings → Secrets and variables → Actions** and add these repository secrets:
+
+- `RENDER_API_DEPLOY_HOOK_URL`
+- `RENDER_DASHBOARD_DEPLOY_HOOK_URL`
+
+Deploy-hook URLs are credentials that can trigger service deployments. Keep them in GitHub Actions secrets; do not commit or print them. If either secret is missing, the deploy job fails with the missing secret's name. Rotate a hook in Render and update the matching GitHub secret if it is exposed.
+
+The dashboard build injects Render's `RENDER_GIT_COMMIT` into a hidden HTML meta tag. The API's public `/actuator/info` response contains only that commit SHA. Neither endpoint returns credentials or user data. The workflow has a 30-minute cap to accommodate Render Free cold starts and builds; Render Free may still suspend idle services between deployments.
