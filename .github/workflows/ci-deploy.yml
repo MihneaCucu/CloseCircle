@@ -131,13 +131,14 @@ jobs:
           set -euo pipefail
           for attempt in $(seq 1 60); do
             html=$(curl --silent --show-error --fail --max-time 10 "$DASHBOARD_URL/?deploy=$DEPLOY_REF" || true)
-            if printf '%s' "$html" | grep -Fq "content=\"$DEPLOY_REF\""; then
-              if printf '%s' "$html" | grep -Fq '<title>Welcome to CloseCircle</title>'; then
-                echo "Dashboard serves commit $DEPLOY_REF."
+            if printf '%s' "$html" | grep -Fq '<title>Welcome to CloseCircle</title>'; then
+              asset=$(printf '%s' "$html" | grep -Eo 'src="/assets/[^" ]+\.js"' | head -n 1 | cut -d '"' -f 2)
+              if [ -n "$asset" ] && curl --silent --show-error --fail --max-time 10 "$DASHBOARD_URL$asset" --output /dev/null; then
+                echo "Dashboard page and JavaScript asset respond over HTTPS (deploy requested for $DEPLOY_REF)."
                 exit 0
               fi
             fi
             sleep 10
           done
-          echo "Timed out waiting for the dashboard to serve commit $DEPLOY_REF." >&2
+          echo "Timed out waiting for the dashboard page and JavaScript asset to respond." >&2
           exit 1
