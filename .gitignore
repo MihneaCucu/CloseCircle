@@ -20,4 +20,10 @@ local.properties
 # macOS
 .DS_Store
 .neon
+
+# Local editor and agent skill setup
+.vscode/
+.agents/
+skills-lock.json
+
 node_modules/
