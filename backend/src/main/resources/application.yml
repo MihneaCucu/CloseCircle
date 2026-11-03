@@ -16,6 +16,9 @@ spring:
       connection-timeout: 10000
       validation-timeout: 5000
       max-lifetime: 600000
+  mvc:
+    problemdetails:
+      enabled: true
   jpa:
     open-in-view: false
     hibernate:

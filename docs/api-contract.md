@@ -1,6 +1,6 @@
 # CloseCircle REST API contract
 
-**Status:** Draft v0.1 — proposed for review under SCRUM-42. The route and payload proposals below are not implemented or team-approved yet. Android, React, simulator, and backend owners must review the open decisions before client implementation. The only currently implemented HTTP endpoints are `GET /actuator/health` and `GET /actuator/info`.
+**Status:** Draft v0.1 — proposed for review under SCRUM-42. The route and payload proposals below are not implemented or team-approved yet. Android, React, simulator, and backend owners must review the open decisions before client implementation. The currently implemented HTTP endpoints are `GET /actuator/health`, `GET /actuator/info`, and the sharing settings routes `GET`/`PUT /api/v1/groups/{groupId}/me/sharing` (T-04).
 
 This document defines the client-facing JSON contract. It is independent of PostgreSQL table names and columns. Persisted schema changes are versioned separately with Flyway under `backend/src/main/resources/db/migration/`.
 
@@ -94,6 +94,7 @@ All other current backend routes require a valid Bearer JWT. The business routes
 | `GET /groups/{groupId}/invitations` | Owner or Admin | User, Admin | UUID `groupId`; optional `status`, `limit`, `cursor` | `200 Page<Invitation>` |
 | `DELETE /groups/{groupId}/invitations/{invitationId}` | Owner or Admin | User, Admin | UUIDs | `204` |
 | `POST /invitations/accept` | User JWT | User | `AcceptInvitationRequest` | `200 Membership` |
+| `GET /groups/{groupId}/me/sharing` | Group member | User | UUID `groupId` | `200 SharingPreferences` |
 | `PUT /groups/{groupId}/me/sharing` | Group member | User | UUID `groupId`; `UpdateSharingRequest` | `200 SharingPreferences` |
 | `POST /groups/{groupId}/locations` | Group member | User | UUID `groupId`; `CreateLocationRequest` | `201 Location` |
 | `GET /groups/{groupId}/locations/latest` | Group member | User, Admin | UUID `groupId`; `limit`, `cursor` | `200 Page<LatestLocation>` |
@@ -271,6 +272,8 @@ Expired, revoked, already-used, or email-mismatched tokens return `400` with a s
   "updatedAt": "2026-10-25T10:30:00Z"
 }
 ```
+
+**Implemented (T-04):** `GET` and `PUT /groups/{groupId}/me/sharing`. Both fields of `UpdateSharingRequest` are required booleans; a missing field returns `400`. A caller who is not a member of the group, or a group that does not exist, gets `404` with code `GROUP_NOT_FOUND`. A member who has never saved settings is treated as not sharing: `GET` returns `sharingEnabled=false`, `shareLiveLocation=false`, and `updatedAt=null`. Settings are stored separately for each group. A member's location is visible to other members of a group only while that member's `sharingEnabled` is `true` in that group; location read routes must apply this rule through `SharingService`.
 
 For v1, `sharingEnabled=false` suppresses all location visibility for the caller; `shareLiveLocation=false` suppresses live location while retaining only history that the user has explicitly agreed may be retained. Whether the API accepts or rejects location uploads while sharing is disabled, and how long history is retained, are blocking privacy decisions and remain unapproved.
 
