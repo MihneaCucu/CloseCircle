@@ -12,7 +12,7 @@ This document defines the client-facing JSON contract. It is independent of Post
 | Demo API base URL | `https://closecircle-api.onrender.com` |
 | Business API prefix | `/api/v1` |
 | Media type | `application/json; charset=utf-8` for request and response bodies |
-| Authentication | `Authorization: Bearer <access-token>` on every `/api/v1/**` request, except registration, login, and invitation acceptance as specified below |
+| Authentication | `Authorization: Bearer <access-token>` on every `/api/v1/**` request, except registration and login |
 | IDs | UUID strings in canonical hyphenated form; clients treat them as opaque values |
 | Time | RFC 3339 timestamps in UTC, serialized with `Z`, for example `2026-10-25T10:15:30Z` |
 | Coordinates | WGS 84 decimal degrees; latitude `[-90, 90]`, longitude `[-180, 180]` |
@@ -73,7 +73,7 @@ The currently implemented infrastructure routes live outside `/api/v1`:
 | `GET /actuator/health` | Public | `200 {"status":"UP","groups":["liveness","readiness"]}` | Render health check; details are not exposed. |
 | `GET /actuator/info` | Public | `200 {"app":{"commit":"<git-sha>"}}` | CI verifies which commit the API serves. |
 
-All other current backend routes require a valid Bearer JWT. The business routes below are a proposal and are not live yet. Registration, login, and invitation acceptance are the only proposed public/user-establishment exceptions; invitation acceptance still requires the invitee's authenticated identity.
+All other current backend routes require a valid Bearer JWT. The business routes below are a proposal and are not live yet. Registration and login are proposed as public routes; invitation acceptance requires the invitee's authenticated identity.
 
 | Method and path | Auth | Client | Request | Success response |
 | --- | --- | --- | --- | --- |
@@ -501,6 +501,10 @@ Sensitive-data rules apply end to end: do not log request bodies, Authorization 
 | Invitation delivery | Out-of-band channel needed; whether the API returns a token once for client-generated links is unresolved | Product, backend, Android | Invitation acceptance |
 | Sharing privacy and retention | Self-service controls; uploads while sharing is off and historical retention are unresolved | Product, privacy, Android | Location read/write |
 | Location limits and offline sync | Five-minute future clock skew; history time window, max upload frequency, batch/idempotency semantics TBD | Android, backend | Location upload/history |
+| Location updates and visibility (SCRUM-19) | The latest-location REST response is proposed; choose how clients refresh it and how quickly visibility changes take effect. Only currently authorized, sharing members may appear. | Android, backend, product | Member location view and updates |
+| Recent versus last known (SCRUM-20) | `recordedAt` is included in location responses; choose the freshness threshold, clock-skew handling, and display when no location exists. | Android, backend, product | Freshness indicator and last-update time |
+| Connection loss and recovery (SCRUM-21) | Showing a permitted last-known location and resuming updates are required; agree where it is cached, how stale status is shown, and whether queued uploads are retried or discarded after consent changes. | Android, backend, product | Offline view and reconnection |
+| Low-accuracy indicator (SCRUM-22) | `accuracyM` is nullable and measured in metres; choose and document a configurable threshold, handling for unknown accuracy, and its visual presentation. Larger reported uncertainty means lower accuracy. | Android, product, backend | Low-accuracy marker |
 | Zone events | Circular zones only; detection state, hysteresis, deduplication, offline delivery handled by functional tasks | Backend, Android | Zone event processing |
 | Notification types and retention | `ZONE_ENTRY` example only; registry, retention and push delivery are separate decisions | Product, backend, Android | Notifications |
 | Simulator behavior | Demo-only scenarios; scenario names, member selection and operational controls TBD | T-06 owner, T-25 owner, backend | Simulator endpoints |
