@@ -33,6 +33,16 @@ jobs:
       - name: Verify Spring Boot backend
         run: mvn -B -ntp -f backend/pom.xml verify
 
+      - name: Install PostgreSQL tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql postgresql-client
+          echo "$(pg_config --bindir)" >> "$GITHUB_PATH"
+
+      - name: Verify location access against PostgreSQL
+        working-directory: backend
+        run: python3 src/test/python/check_latest_locations.py
+
       - name: Build backend Docker image
         run: docker build --tag closecircle-api:ci --file backend/Dockerfile backend
 
