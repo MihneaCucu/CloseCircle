@@ -409,6 +409,8 @@ Building on SCRUM-20, the SCRUM-22 branch adds optional `accuracy` to each permi
 
 Accuracy and freshness are independent and never grant visibility. This is implemented for review on the feature branch, not deployed or team-approved. The product threshold and Android marker remain for review and client implementation; see [location-accuracy.md](location-accuracy.md).
 
+The latest-location read endpoint rejects non-canonical JWT UUID subjects with `401 INVALID_TOKEN` and a Bearer challenge. Invalid path/query types return `400 INVALID_PARAMETER`; malformed, unrepresentable or sub-microsecond cursors return `400 INVALID_CURSOR`. These local errors use Problem Details and `Cache-Control: no-store` without echoing input values.
+
 ## 5. Pagination and filtering
 
 Collection responses use:

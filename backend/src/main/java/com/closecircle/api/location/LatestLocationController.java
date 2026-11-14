@@ -3,6 +3,7 @@ package com.closecircle.api.location;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestController
 @RequestMapping("/api/v1/groups/{groupId}/locations")
@@ -33,6 +35,7 @@ public class LatestLocationController {
         UUID userId;
         try {
             userId = UUID.fromString(jwt.getSubject());
+            if (!userId.toString().equalsIgnoreCase(jwt.getSubject())) throw new IllegalArgumentException();
         } catch (IllegalArgumentException | NullPointerException ex) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token subject");
         }
@@ -41,7 +44,7 @@ public class LatestLocationController {
     }
 
     @ExceptionHandler(ResponseStatusException.class)
-    ProblemDetail problem(ResponseStatusException ex) {
+    ResponseEntity<ProblemDetail> problem(ResponseStatusException ex) {
         ProblemDetail body = ex.getBody();
         body.setProperty("code", switch (ex.getStatusCode().value()) {
             case 400 -> "INVALID_CURSOR";
@@ -49,6 +52,15 @@ public class LatestLocationController {
             case 404 -> "GROUP_NOT_FOUND";
             default -> "REQUEST_FAILED";
         });
-        return body;
+        var response = ResponseEntity.status(ex.getStatusCode()).cacheControl(CacheControl.noStore());
+        if (ex.getStatusCode().value() == 401) response.header(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
+        return response.body(body);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ProblemDetail> invalidParameter(MethodArgumentTypeMismatchException ex) {
+        var body = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Invalid path or query parameter");
+        body.setProperty("code", "INVALID_PARAMETER");
+        return ResponseEntity.badRequest().cacheControl(CacheControl.noStore()).body(body);
     }
 }

@@ -30,3 +30,7 @@ __pycache__/
 skills-lock.json
 
 node_modules/
+
+# Python regression caches
+__pycache__/
+*.py[cod]
