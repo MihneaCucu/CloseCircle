@@ -397,6 +397,12 @@ Precise coordinates, location payloads, authorization headers, and invitation to
 
 Allowed scenarios and controls are provisional. A simulator must use synthetic accounts and locations, have a short maximum duration, and be disabled in production. `GET` returns the same scenario object; `POST .../{scenarioId}/stop` returns `204`. The simulator must never accept a client-supplied identity as authority to write a real member's location.
 
+### Freshness metadata (SCRUM-20 development branch)
+
+The SCRUM-20 branch builds on the unmerged SCRUM-19 endpoint and adds optional `freshness` to each permitted `LatestLocation` member. Set `closecircle.location.recent-for-seconds` to enable it; there is no product default, and without configuration the field is omitted. Its object is `{status, evaluatedAt, recentForSeconds}`: `status` is `RECENT`, `LAST_KNOWN`, or `UNKNOWN`; `evaluatedAt` is one server UTC timestamp shared by the response; `recentForSeconds` is the configured non-negative integer window. The existing `location.recordedAt` remains the displayed update time.
+
+An age at or below the window is recent. Older points are last-known, and missing/future points are unknown. Classification uses recording time, not receipt time, and never changes visibility. This is implemented for review on the feature branch, not deployed or team-approved. See [location-freshness.md](location-freshness.md) for configuration, tests and remaining decisions.
+
 ## 5. Pagination and filtering
 
 Collection responses use:

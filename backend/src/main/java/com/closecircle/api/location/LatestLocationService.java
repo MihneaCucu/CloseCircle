@@ -8,6 +8,8 @@ import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -17,14 +19,17 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class LatestLocationService {
     private final JdbcTemplate jdbc;
+    private final LocationFreshnessPolicy freshness;
 
-    public LatestLocationService(JdbcTemplate jdbc) {
+    public LatestLocationService(JdbcTemplate jdbc, LocationFreshnessPolicy freshness) {
         this.jdbc = jdbc;
+        this.freshness = freshness;
     }
 
     public record Location(UUID locationId, UUID groupId, UUID userId, double latitude, double longitude,
                            Double accuracyM, Instant recordedAt, Instant receivedAt) { }
-    public record MemberLocation(UUID userId, String displayName, Location location) { }
+    public record MemberLocation(UUID userId, String displayName, Location location,
+            @JsonInclude(JsonInclude.Include.NON_NULL) LocationFreshnessPolicy.Metadata freshness) { }
     public record Page(List<MemberLocation> items, String nextCursor) { }
     private record Row(MemberLocation item, Instant joinedAt) { }
     private record Cursor(Instant joinedAt, UUID userId) { }
@@ -42,6 +47,7 @@ public class LatestLocationService {
 
         OffsetDateTime since = cursor == null ? null : cursor.joinedAt().atOffset(ZoneOffset.UTC);
         UUID afterUser = cursor == null ? null : cursor.userId();
+        Instant evaluatedAt = freshness.now();
         List<Row> rows = jdbc.query("""
                 SELECT gm.user_id, gm.joined_at, u.display_name,
                        l.location_id, l.latitude, l.longitude, l.accuracy_m, l.recorded_at, l.received_at
@@ -68,7 +74,8 @@ public class LatestLocationService {
                             rs.getObject("accuracy_m", Double.class),
                             rs.getObject("recorded_at", OffsetDateTime.class).toInstant(),
                             rs.getObject("received_at", OffsetDateTime.class).toInstant());
-                    return new Row(new MemberLocation(userId, rs.getString("display_name"), location),
+                    return new Row(new MemberLocation(userId, rs.getString("display_name"), location,
+                            freshness.assess(location == null ? null : location.recordedAt(), evaluatedAt)),
                             rs.getObject("joined_at", OffsetDateTime.class).toInstant());
                 }, groupId, viewerId, viewerId, since, since, afterUser, limit + 1);
         boolean more = rows.size() > limit;

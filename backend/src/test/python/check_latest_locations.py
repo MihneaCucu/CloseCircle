@@ -28,7 +28,7 @@ def b64(value):
     return base64.urlsafe_b64encode(value).rstrip(b'=').decode()
 
 
-def main():
+def main(verify=None, app_args=()):
     if not __debug__:
         raise SystemExit('Run without Python optimization so assertions are enabled.')
     backend = Path(__file__).resolve().parents[3]
@@ -61,7 +61,7 @@ def main():
                        DATABASE_USERNAME=getpass.getuser(), DATABASE_PASSWORD='', JWT_SECRET=secret,
                        PORT=str(api_port))
             with open(Path(temp) / 'app.log', 'w') as log:
-                app = subprocess.Popen(['java', '-jar', str(jar)], env=env, stdout=log, stderr=subprocess.STDOUT)
+                app = subprocess.Popen(['java', '-jar', str(jar), *app_args], env=env, stdout=log, stderr=subprocess.STDOUT)
                 base = f'http://127.0.0.1:{api_port}'
                 for _ in range(100):
                     if app.poll() is not None:
@@ -137,6 +137,8 @@ def main():
                 point = next(item for item in items if item['userId'] == ids[1])['location']
                 assert point['groupId'] == group and point['latitude'] == 3 and point['longitude'] == 4 and point['accuracyM'] == 6.5
                 assert next(item for item in items if item['userId'] == ids[2])['location'] is None
+                if verify is not None:
+                    verify(sql, request, group, other_group, ids)
                 status, problem = request(ids[0], '?cursor=not-valid')
                 assert status == 400 and problem['code'] == 'INVALID_CURSOR'
                 sql(f"INSERT INTO locations(group_id,user_id,latitude,longitude,recorded_at) VALUES ('{group}','{ids[1]}',5,6,'2026-01-03T00:00:00Z');")
