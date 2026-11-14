@@ -397,6 +397,8 @@ Precise coordinates, location payloads, authorization headers, and invitation to
 
 Allowed scenarios and controls are provisional. A simulator must use synthetic accounts and locations, have a short maximum duration, and be disabled in production. `GET` returns the same scenario object; `POST .../{scenarioId}/stop` returns `204`. The simulator must never accept a client-supplied identity as authority to write a real member's location.
 
+The latest-location read endpoint rejects non-canonical JWT UUID subjects with `401 INVALID_TOKEN` and a Bearer challenge. Invalid path/query types return `400 INVALID_PARAMETER`; malformed, unrepresentable or sub-microsecond cursors return `400 INVALID_CURSOR`. These local errors use Problem Details and `Cache-Control: no-store` without echoing input values.
+
 ## 5. Pagination and filtering
 
 Collection responses use:

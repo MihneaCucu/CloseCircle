@@ -110,6 +110,10 @@ def main():
                             assert 'no-store' in response.headers.get('Cache-Control', '')
                             return response.status, json.load(response)
                     except urllib.error.HTTPError as error:
+                        if error.code == 401:
+                            assert error.headers.get('WWW-Authenticate', '').startswith('Bearer')
+                        if error.code in (400, 404):
+                            assert 'no-store' in error.headers.get('Cache-Control', '')
                         body = error.read()
                         return error.code, json.loads(body) if body else None
 
@@ -119,6 +123,12 @@ def main():
                 assert request(bearer=token(ids[0], issuer='wrong-issuer'))[0] == 401
                 assert request(bearer=token(ids[0], expires=int(time.time()) - 600))[0] == 401
                 assert request(bearer=token('not-a-uuid'))[0] == 401
+                assert request(bearer=token('0-0-0-0-1'))[0] == 401
+                for suffix in ('?limit=word', '?limit=1.5', '?limit=2147483648'):
+                    status, problem = request(ids[0], suffix)
+                    assert status == 400 and problem['code'] == 'INVALID_PARAMETER'
+                status, problem = request(ids[0], group_id='not-a-uuid')
+                assert status == 400 and problem['code'] == 'INVALID_PARAMETER'
                 status, problem = request(ids[6])
                 assert status == 404 and problem['code'] == 'GROUP_NOT_FOUND'
                 status, absent = request(ids[0], group_id=missing_group)
@@ -139,6 +149,15 @@ def main():
                 assert next(item for item in items if item['userId'] == ids[2])['location'] is None
                 status, problem = request(ids[0], '?cursor=not-valid')
                 assert status == 400 and problem['code'] == 'INVALID_CURSOR'
+                for value in ('+999999999-01-01T00:00:00Z/' + ids[1],
+                              '-999999999-01-01T00:00:00Z/' + ids[1],
+                              '+294277-01-01T00:00:00Z/' + ids[1],
+                              '2026-01-01T00:00:00.000000001Z/' + ids[1],
+                              '2026-01-01T00:00:00Z/0-0-0-0-2'):
+                    status, problem = request(ids[0], '?cursor=' + b64(value.encode()))
+                    assert status == 400 and problem['code'] == 'INVALID_CURSOR'
+                assert len(request(ids[0], '?limit=0')[1]['items']) == 1
+                assert len(request(ids[0], '?limit=1000')[1]['items']) == 2
                 sql(f"INSERT INTO locations(group_id,user_id,latitude,longitude,recorded_at) VALUES ('{group}','{ids[1]}',5,6,'2026-01-03T00:00:00Z');")
                 status, updated = request(ids[0])
                 assert status == 200 and next(item for item in updated['items'] if item['userId'] == ids[1])['location']['latitude'] == 5
