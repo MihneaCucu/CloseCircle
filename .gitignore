@@ -32,3 +32,6 @@ node_modules/
 .venv-contract/
 __pycache__/
 *.py[cod]
+
+# Isolated CI backend checkout
+.backend-under-test/

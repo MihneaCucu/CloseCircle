@@ -16,7 +16,7 @@ python3 -m venv .venv-contract
 .venv-contract/bin/python backend/src/test/python/check_api_contract.py
 ```
 
-The CI contract workflow validates the OpenAPI document and its schemas, then runs 40 positive/negative examples from `location-examples.json`. Examples are synthetic. The checks cover required/optional/null fields, coordinate bounds, timestamp formats, identity overrides, response extensions, metadata enums and error bodies. They do not prove authorization, freshness calculations or mobile behavior; the backend PostgreSQL regressions cover server behavior separately.
+The CI contract workflow first validates the OpenAPI document and its schemas, then runs 40 positive/negative examples from `location-examples.json`. Its next job builds the pinned backend snapshot and runs the real API/PostgreSQL contract check. A third job collects unit and HTTP/PostgreSQL coverage. Examples are synthetic. The checks cover required/optional/null fields, coordinate bounds, timestamp formats, identity overrides, response extensions, metadata enums and error bodies. They do not prove authorization, freshness calculations or mobile behavior; the backend PostgreSQL regressions cover server behavior separately.
 
 Validate a saved **synthetic** request or response, without sending it anywhere:
 
@@ -31,7 +31,7 @@ Requests reject unknown properties. Responses tolerate extra fields so additive 
 
 ## Check against the pending backend
 
-The optional HTTP check uses the real feature API and its existing disposable PostgreSQL harness. It does not connect to Neon or any remote API. PostgreSQL command-line tools and Java 21+ are required. Use a separate trusted checkout containing PR #5 and build its jar first:
+The HTTP check uses the real feature API and its existing disposable PostgreSQL harness, both locally and in CI. It does not connect to Neon or any remote API. PostgreSQL command-line tools and Java 21+ are required. Use a separate trusted checkout containing PR #5 and build its jar first:
 
 ```sh
 mvn -f /path/to/feature-checkout/backend/pom.xml clean verify
@@ -39,7 +39,32 @@ mvn -f /path/to/feature-checkout/backend/pom.xml clean verify
   --backend-root /path/to/feature-checkout/backend
 ```
 
-The runner executes that checkout's test harness, seeds synthetic prerequisite accounts/memberships/consent, uploads a point through HTTP, and validates actual read/upload/error responses against this branch's schemas. It also runs the harness's authorization, group-isolation, pagination and sharing-revocation checks. Only use a trusted checkout. The standard contract CI job checks the document/examples; it does not claim to run this optional feature-dependent HTTP check until those endpoints are in its checkout.
+The runner executes that checkout's test harness, seeds synthetic prerequisite accounts/memberships/consent, uploads a point through HTTP, and validates actual read/upload/error responses against this branch's schemas. It also runs the harness's authorization, group-isolation, pagination and sharing-revocation checks. Only use a trusted checkout. The CI `http-contract` job executes this check after static validation. It validates actual operation-specific status/body schemas and upload headers, including 201 creation, 200 replay, 409 conflict, 400 invalid input, 401 invalid subject, 403 disabled sharing and 404 inaccessible group.
+
+## CI pairing and coverage reports
+
+The workflow `.github/workflows/api-contract.yml` pins `LOCATION_BACKEND_COMMIT` to `a505df189ebe7dec15eb75c92194072df7de3d30`, the PR #5 integration snapshot. Every PR #6 update validates its current contract/tooling against that exact backend. This keeps PR #6 independent from the unmerged business implementation. It is not an automatic test of every later backend branch head: update the reviewed SHA when changing the integration snapshot. Once the endpoint PRs are merged, switch the workflow to the same checkout and remove the temporary pairing. The job does not deploy anything or use cloud/database secrets.
+
+After the real API contract job passes, the coverage job builds the same backend with JaCoCo 0.8.14. It runs the 21 unit/configuration tests, all five existing PostgreSQL suites (access, freshness, accuracy, recovery and upload), and the real API contract check. The instrumented API JVMs retain their existing sanitized environment; a temporary local Java launcher adds the coverage agent, including across restarts. The runner changes neither the backend POM nor its source or harness.
+
+Download **backend-location-coverage** from the workflow run's Artifacts section (retained 14 days). It contains:
+
+- `unit/index.html`, `http-postgres/index.html`, `combined/index.html`: separate human-readable reports, with XML and CSV in each directory.
+- `unit.exec`, `http-postgres.exec`: raw execution data for the same compiled classes.
+- `manifest.json`: exact backend and contract/tooling commits, dirty-state flags, individual check exit codes, unit test totals and coverage counters.
+- `summary.md`: the same coverage table shown in the GitHub Actions job summary.
+
+The denominator includes **all compiled backend application classes**, including uncovered ones; test code and framework dependencies are not included. Combined coverage is the union of unit and HTTP execution, not their average. No arbitrary percentage gate is imposed. The job fails if a suite fails, execution data/reports are missing, or the instrumented HTTP run does not cover the read/upload controllers and services. Available partial reports are preserved on failure and clearly labelled incomplete. Never present those as passing checkpoint evidence.
+
+For a fresh local measurement, use the same trusted backend checkout as above:
+
+```sh
+.venv-contract/bin/python backend/src/test/python/run_backend_coverage.py \
+  --backend-root /path/to/feature-checkout/backend \
+  --output /tmp/closecircle-coverage-new-run
+```
+
+Maven resolves the pinned JaCoCo tools. Use a fresh output directory whose path has no spaces, commas or equals signs. The runner cleans the backend build directory, so it must be an isolated test checkout. All database activity uses disposable synthetic fixtures; no production/Neon connection is used. Coverage measures exercised code, not Android behavior, real auth/group/sharing integration, independent human acceptance or completion of the one-third story target. Implementation details: [JaCoCo agent](https://www.jacoco.org/jacoco/trunk/doc/agent.html), [report CLI](https://www.jacoco.org/jacoco/trunk/doc/cli.html).
 
 ## Checkpoint priority
 
