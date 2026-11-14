@@ -423,6 +423,8 @@ An optional UUID `Idempotency-Key` header makes retries safe within the authenti
 
 This is implemented and tested on the feature branch, not deployed or accepted as a whole story. See [location-upload.md](location-upload.md) for error, configuration, migration and test details, and [checkpoint-2-readiness.md](checkpoint-2-readiness.md) for the story-count boundary.
 
+The latest-location read endpoint rejects non-canonical JWT UUID subjects with `401 INVALID_TOKEN` and a Bearer challenge. Invalid path/query types return `400 INVALID_PARAMETER`; malformed, unrepresentable or sub-microsecond cursors return `400 INVALID_CURSOR`. These local errors use Problem Details and `Cache-Control: no-store` without echoing input values.
+
 ## 5. Pagination and filtering
 
 Collection responses use:
