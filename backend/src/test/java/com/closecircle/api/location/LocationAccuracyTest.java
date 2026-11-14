@@ -32,6 +32,8 @@ class LocationAccuracyTest {
     void thresholdCanBeChangedWithoutChangingTheMeasurement() {
         assertEquals(LocationAccuracy.Status.POOR, new LocationAccuracy(25).assess(50.0));
         assertEquals(LocationAccuracy.Status.ACCEPTABLE, new LocationAccuracy(75).assess(50.0));
+        assertEquals(new LocationAccuracy.Metadata(LocationAccuracy.Status.POOR, 25),
+                new LocationAccuracy(25).metadata(50.0));
     }
 
     @Test

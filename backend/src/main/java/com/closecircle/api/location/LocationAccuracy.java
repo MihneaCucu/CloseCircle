@@ -3,6 +3,7 @@ package com.closecircle.api.location;
 /** Assesses reported uncertainty in metres; it does not determine location visibility. */
 public final class LocationAccuracy {
     public enum Status { ACCEPTABLE, POOR, UNKNOWN }
+    public record Metadata(Status status, double poorAccuracyThresholdM) { }
 
     private final double poorAccuracyThresholdM;
 
@@ -18,5 +19,9 @@ public final class LocationAccuracy {
             return Status.UNKNOWN;
         }
         return accuracyM > poorAccuracyThresholdM ? Status.POOR : Status.ACCEPTABLE;
+    }
+
+    public Metadata metadata(Double accuracyM) {
+        return new Metadata(assess(accuracyM), poorAccuracyThresholdM);
     }
 }

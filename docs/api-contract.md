@@ -403,6 +403,12 @@ The SCRUM-20 branch builds on the unmerged SCRUM-19 endpoint and adds optional `
 
 An age at or below the window is recent. Older points are last-known, and missing/future points are unknown. Classification uses recording time, not receipt time, and never changes visibility. This is implemented for review on the feature branch, not deployed or team-approved. See [location-freshness.md](location-freshness.md) for configuration, tests and remaining decisions.
 
+### Accuracy metadata (SCRUM-22 development branch)
+
+Building on SCRUM-20, the SCRUM-22 branch adds optional `accuracy` to each permitted `LatestLocation` member. Set `closecircle.location.poor-accuracy-threshold-m` to a finite positive number of metres to enable it. With no configured threshold the field is omitted. The object is `{status, poorAccuracyThresholdM}`: `status` is `ACCEPTABLE` for finite non-negative uncertainty at or below the threshold, `POOR` above it, or `UNKNOWN` for missing/invalid uncertainty. A member with `location: null` gets `UNKNOWN`. Non-finite or negative stored uncertainty is exposed as `accuracyM: null`.
+
+Accuracy and freshness are independent and never grant visibility. This is implemented for review on the feature branch, not deployed or team-approved. The product threshold and Android marker remain for review and client implementation; see [location-accuracy.md](location-accuracy.md).
+
 ## 5. Pagination and filtering
 
 Collection responses use:
