@@ -2,6 +2,8 @@
 
 **Status:** Draft v0.1 — proposed for review under SCRUM-42. The route and payload proposals below are not implemented or team-approved yet. Android, React, simulator, and backend owners must review the open decisions before client implementation. The only currently implemented HTTP endpoints are `GET /actuator/health` and `GET /actuator/info`.
 
+For the location slice implemented on the pending SCRUM-19/20/21/22/43 feature PRs, use the [machine-readable integration contract](contracts/README.md). It records tested read/upload behavior, including configurable metadata, offset timestamp normalization, conservative consent checks and idempotent retries. It is a review draft; these routes are not implemented on this branch or deployed. Its feature details take precedence over older location proposals below for integration testing, without implying team approval.
+
 This document defines the client-facing JSON contract. It is independent of PostgreSQL table names and columns. Persisted schema changes are versioned separately with Flyway under `backend/src/main/resources/db/migration/`.
 
 ## 1. Contract rules

@@ -27,3 +27,8 @@ local.properties
 skills-lock.json
 
 node_modules/
+
+# Python contract validation environments and caches
+.venv-contract/
+__pycache__/
+*.py[cod]
