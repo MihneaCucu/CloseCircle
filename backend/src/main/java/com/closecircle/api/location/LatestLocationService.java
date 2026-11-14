@@ -19,6 +19,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class LatestLocationService {
+    // Finite PostgreSQL timestamp bounds (src/include/datatype/timestamp.h).
+    private static final Instant MIN_CURSOR_TIME = Instant.parse("-4713-11-24T00:00:00Z");
+    private static final Instant END_CURSOR_TIME = Instant.parse("+294277-01-01T00:00:00Z");
     private final JdbcTemplate jdbc;
     private final LocationFreshnessPolicy freshness;
     private final LocationAccuracy accuracy;
@@ -106,7 +109,13 @@ public class LatestLocationService {
             String decoded = new String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8);
             String[] parts = decoded.split("/", -1);
             if (parts.length != 2) throw new IllegalArgumentException();
-            return new Cursor(Instant.parse(parts[0]), UUID.fromString(parts[1]));
+            Instant joinedAt = Instant.parse(parts[0]);
+            UUID userId = UUID.fromString(parts[1]);
+            if (joinedAt.isBefore(MIN_CURSOR_TIME) || !joinedAt.isBefore(END_CURSOR_TIME)
+                    || joinedAt.getNano() % 1000 != 0 || !userId.toString().equalsIgnoreCase(parts[1])) {
+                throw new IllegalArgumentException();
+            }
+            return new Cursor(joinedAt, userId);
         } catch (RuntimeException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid cursor");
         }

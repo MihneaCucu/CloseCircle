@@ -1,5 +1,6 @@
 """Exercise SCRUM-20 through the authenticated API and disposable PostgreSQL."""
 from datetime import datetime, timedelta, timezone
+import time
 
 from check_latest_locations import main
 
@@ -41,6 +42,32 @@ def verify(sql, request, group, other_group, ids):
     print('PASS: freshness in HTTP responses uses recording time, shared evaluation time and configured window')
 
 
+def verify_aging(sql, request, group, other_group, ids):
+    recorded = datetime.now(timezone.utc)
+    sql(f"UPDATE locations SET recorded_at='{recorded.isoformat()}' "
+        f"WHERE group_id='{group}' AND user_id='{ids[1]}';")
+
+    def member():
+        status, page = request(ids[0])
+        assert status == 200
+        return next(item for item in page['items'] if item['userId'] == ids[1])
+
+    recent = member()
+    assert recent['freshness']['status'] == 'RECENT'
+    deadline = time.monotonic() + 12
+    while True:
+        last_known = member()
+        if last_known['freshness']['status'] == 'LAST_KNOWN':
+            break
+        assert time.monotonic() < deadline, 'Point never aged out of the configured window'
+        time.sleep(0.2)
+    assert recent['location'] == last_known['location'], 'Aging must preserve the last point and timestamp'
+    assert recent['freshness']['evaluatedAt'] < last_known['freshness']['evaluatedAt']
+    sql(f"UPDATE locations SET recorded_at='2026-01-02T00:00:00Z' "
+        f"WHERE group_id='{group}' AND user_id='{ids[1]}';")
+    print('PASS: repeated reads age RECENT into LAST_KNOWN without replacing the point')
+
+
 def verify_disabled(sql, request, group, other_group, ids):
     assert all('freshness' not in item for item in request(ids[0])[1]['items'])
     print('PASS: unconfigured freshness preserves the existing response')
@@ -49,3 +76,4 @@ def verify_disabled(sql, request, group, other_group, ids):
 if __name__ == '__main__':
     main(verify_disabled)
     main(verify, ('--closecircle.location.recent-for-seconds=300',))
+    main(verify_aging, ('--closecircle.location.recent-for-seconds=5',))

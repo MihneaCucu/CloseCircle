@@ -413,6 +413,8 @@ Accuracy and freshness are independent and never grant visibility. This is imple
 
 The read endpoint preserves the saved point and its original timestamps when no new recording arrives, including across API/database restart. A delayed older recording does not replace a more recent recorded point; a new accepted recording is visible on the next read, subject to current membership/sharing checks. SCRUM-21 verifies these behaviours against PostgreSQL. This does not implement or verify upload ingestion, mobile offline caching/retries, or a device connectivity signal. See [location-recovery.md](location-recovery.md) for coverage and the remaining end-to-end work.
 
+The latest-location read endpoint rejects non-canonical JWT UUID subjects with `401 INVALID_TOKEN` and a Bearer challenge. Invalid path/query types return `400 INVALID_PARAMETER`; malformed, unrepresentable or sub-microsecond cursors return `400 INVALID_CURSOR`. These local errors use Problem Details and `Cache-Control: no-store` without echoing input values.
+
 ## 5. Pagination and filtering
 
 Collection responses use:
