@@ -2,6 +2,26 @@
 
 The confirmed target is the weeks 7-8 milestone: implement at least one-third of the User Stories committed for implementation. The course handout, *Proiect de laborator MOPS*, page 8, section II, defines this target; pages 1 and 4-6 describe acceptance checks, Definition of Done, tests and development-process evidence. Backend endpoints, technical tasks and subtasks are not automatically separate completed User Stories.
 
+## Backend handoff for SCRUM-19 and SCRUM-20
+
+The backend implementation is available for review on PR [#1](https://github.com/MihneaCucu/CloseCircle/pull/1) (member locations), PR [#3](https://github.com/MihneaCucu/CloseCircle/pull/3) (freshness), and PR [#5](https://github.com/MihneaCucu/CloseCircle/pull/5) (upload, including the intervening recovery/accuracy dependencies). These PRs are dependent and must be reviewed/merged in order; a checkout of `dev` alone does not contain this implementation.
+
+- SCRUM-19: authenticated member-location reads, latest recorded point, missing-point handling, pagination, group isolation, both sharing controls, and current membership checks are implemented. Malformed parameters/cursors and noncanonical token subjects return controlled errors.
+- SCRUM-20: the response includes RECENT, LAST_KNOWN or UNKNOWN and the original `location.recordedAt` when a freshness window is configured. Repeated reads re-evaluate age without deleting/replacing the last point; receipt time cannot make an old recording recent.
+- The upload branch verifies the connected backend flow using real HTTP uploads: old point -> LAST_KNOWN, new point -> RECENT, time passing -> LAST_KNOWN with the exact same point, resumed upload -> RECENT, sharing off -> hidden. Account, membership and consent prerequisites are synthetic fixtures; authentication issuance and group/sharing screens remain integration dependencies.
+
+For a local backend demonstration, check out `feature/SCRUM-43-location-upload` and run from the repository root:
+
+```sh
+mvn -f backend/pom.xml clean verify
+python3 backend/src/test/python/check_location_freshness.py
+python3 backend/src/test/python/check_location_upload.py
+```
+
+Java 21+, Maven, Python 3 and PostgreSQL tools (`initdb`, `pg_ctl`, `createdb`, `psql`) are required. The checks launch disposable local databases and the actual API; they never connect to Neon. CI runs these checks too. Use `--closecircle.location.recent-for-seconds=300` or `CLOSECIRCLE_LOCATION_RECENTFORSECONDS=300` when starting the API for a manual demo. This is an explicit example window; the team must select the product value. Without a configured window, `freshness` is omitted. The five-second window in the automatic transition test is only a test setting.
+
+Android presentation, map refresh and UI acceptance belong to the client owners. Review, merge, environment configuration and integrated acceptance remain before whole stories can be marked Done. No additional Android implementation is part of this backend handoff.
+
 ## Current evidence on 14 November 2026
 
 The Jira query `project = SCRUM AND sprint = 1 AND issuetype = Story ORDER BY key ASC` returns **18 User Stories**, all in Backlog, To Do or In Progress; none is marked Done. If Sprint 1 is the team's committed implementation scope, the checkpoint minimum is **ceil(18 / 3) = 6 accepted implemented stories**. The Product Owner must confirm that this is the scope agreed with the instructor; a different committed scope changes the denominator.

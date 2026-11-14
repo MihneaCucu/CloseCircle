@@ -2,6 +2,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 import json
+import time
 import urllib.error
 import urllib.request
 import uuid
@@ -117,5 +118,59 @@ def verify(sql, latest, restart, base, token, group, other_group, ids):
     print('PASS: authenticated upload, read-back, restart/concurrent retries, validation, isolation and consent')
 
 
+def verify_checkpoint(sql, latest, restart, base, token, group, other_group, ids):
+    # Only account/membership/consent prerequisites use fixtures. Every point in
+    # this scenario enters through the public upload API, as it would on Android.
+    sql("UPDATE shares SET updated_at='2026-01-01T00:00:00Z';")
+    created = []
+
+    def upload(age):
+        recorded = (datetime.now(timezone.utc) - timedelta(seconds=age)).isoformat()
+        payload = dict(latitude=44.4, longitude=26.1, accuracyM=8, recordedAt=recorded)
+        req = urllib.request.Request(f'{base}/api/v1/groups/{group}/locations',
+            data=json.dumps(payload).encode(), method='POST', headers={
+                'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token(ids[1]),
+                'Idempotency-Key': str(uuid.uuid4())})
+        with urllib.request.urlopen(req, timeout=10) as response:
+            assert response.status == 201
+            point = json.load(response)
+            created.append(point['locationId'])
+            return point
+
+    def member():
+        status, page = latest(ids[0])
+        assert status == 200
+        return next(item for item in page['items'] if item['userId'] == ids[1])
+
+    old = upload(60)
+    last_known = member()
+    assert last_known['location'] == old
+    assert last_known['freshness']['status'] == 'LAST_KNOWN'
+    recent = upload(0)
+    current = member()
+    assert current['location'] == recent
+    assert current['freshness']['status'] == 'RECENT'
+    assert current['freshness']['recentForSeconds'] == 5
+    deadline = time.monotonic() + 12
+    while True:
+        aged = member()
+        if aged['freshness']['status'] == 'LAST_KNOWN':
+            break
+        assert time.monotonic() < deadline, 'Uploaded point did not age to last-known'
+        time.sleep(0.2)
+    assert aged['location'] == recent
+    resumed = upload(0)
+    assert member()['location'] == resumed
+    assert member()['freshness']['status'] == 'RECENT'
+    assert latest(ids[0], group_id=other_group)[0] == 404
+    sql(f"UPDATE shares SET sharing_enabled=false WHERE group_id='{group}' AND user_id='{ids[1]}';")
+    assert all(item['userId'] != ids[1] for item in latest(ids[0])[1]['items'])
+    sql(f"UPDATE shares SET sharing_enabled=true WHERE group_id='{group}' AND user_id='{ids[1]}';")
+    quoted = ','.join("'" + value + "'" for value in created)
+    sql(f"DELETE FROM locations WHERE location_id IN ({quoted});")
+    print('PASS: checkpoint HTTP upload/read flow, recent-to-last-known aging, resumed updates and privacy')
+
+
 if __name__ == '__main__':
     main(app_args=('--closecircle.location.recent-for-seconds=300',), verify_upload=verify)
+    main(app_args=('--closecircle.location.recent-for-seconds=5',), verify_upload=verify_checkpoint)
