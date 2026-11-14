@@ -409,6 +409,10 @@ Building on SCRUM-20, the SCRUM-22 branch adds optional `accuracy` to each permi
 
 Accuracy and freshness are independent and never grant visibility. This is implemented for review on the feature branch, not deployed or team-approved. The product threshold and Android marker remain for review and client implementation; see [location-accuracy.md](location-accuracy.md).
 
+### Last-known recovery (SCRUM-21 backend read path)
+
+The read endpoint preserves the saved point and its original timestamps when no new recording arrives, including across API/database restart. A delayed older recording does not replace a more recent recorded point; a new accepted recording is visible on the next read, subject to current membership/sharing checks. SCRUM-21 verifies these behaviours against PostgreSQL. This does not implement or verify upload ingestion, mobile offline caching/retries, or a device connectivity signal. See [location-recovery.md](location-recovery.md) for coverage and the remaining end-to-end work.
+
 ## 5. Pagination and filtering
 
 Collection responses use:

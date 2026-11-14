@@ -28,7 +28,7 @@ def b64(value):
     return base64.urlsafe_b64encode(value).rstrip(b'=').decode()
 
 
-def main(verify=None, app_args=()):
+def main(verify=None, app_args=(), verify_recovery=None):
     if not __debug__:
         raise SystemExit('Run without Python optimization so assertions are enabled.')
     backend = Path(__file__).resolve().parents[3]
@@ -48,6 +48,17 @@ def main(verify=None, app_args=()):
         data = Path(temp) / 'pg'
         server_started = False
         app = None
+        def stop_app():
+            nonlocal app
+            if app is not None:
+                app.terminate()
+                try:
+                    app.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    app.kill()
+                    app.wait()
+                app = None
+
         try:
             subprocess.run(['initdb', '-D', str(data), '-A', 'trust', '--no-locale'],
                            check=True, stdout=subprocess.DEVNULL, env=safe_env)
@@ -61,18 +72,34 @@ def main(verify=None, app_args=()):
                        DATABASE_USERNAME=getpass.getuser(), DATABASE_PASSWORD='', JWT_SECRET=secret,
                        PORT=str(api_port))
             with open(Path(temp) / 'app.log', 'w') as log:
-                app = subprocess.Popen(['java', '-jar', str(jar), *app_args], env=env, stdout=log, stderr=subprocess.STDOUT)
                 base = f'http://127.0.0.1:{api_port}'
-                for _ in range(100):
-                    if app.poll() is not None:
-                        raise RuntimeError('Backend exited during startup: ' + (Path(temp) / 'app.log').read_text())
-                    try:
-                        urllib.request.urlopen(base + '/actuator/health', timeout=1).close()
-                        break
-                    except (OSError, urllib.error.URLError):
-                        time.sleep(0.1)
-                else:
+                def start_app():
+                    nonlocal app
+                    app = subprocess.Popen(['java', '-jar', str(jar), *app_args], env=env, stdout=log, stderr=subprocess.STDOUT)
+                    for _ in range(300):
+                        if app.poll() is not None:
+                            raise RuntimeError('Backend exited during startup: ' + (Path(temp) / 'app.log').read_text())
+                        try:
+                            urllib.request.urlopen(base + '/actuator/health', timeout=1).close()
+                            return
+                        except (OSError, urllib.error.URLError):
+                            time.sleep(0.1)
                     raise RuntimeError('Backend did not start')
+
+                def restart_app(restart_database=False):
+                    nonlocal server_started
+                    stop_app()
+                    if restart_database:
+                        subprocess.run(['pg_ctl', '-D', str(data), '-m', 'fast', '-w', 'stop'],
+                                       check=True, stdout=subprocess.DEVNULL, env=safe_env)
+                        server_started = False
+                        subprocess.run(['pg_ctl', '-D', str(data), '-l', str(Path(temp) / 'pg.log'),
+                                        '-o', f'-p {pg_port} -h 127.0.0.1 -k {temp}', '-w', 'start'],
+                                       check=True, stdout=subprocess.DEVNULL, env=safe_env)
+                        server_started = True
+                    start_app()
+
+                start_app()
 
                 db = ['psql', '-X', '-h', '127.0.0.1', '-p', str(pg_port), '-d', 'closecircle_test_scrum19',
                       '-v', 'ON_ERROR_STOP=1', '-q']
@@ -106,7 +133,7 @@ def main(verify=None, app_args=()):
                     headers = {'Authorization': 'Bearer ' + credential} if credential else {}
                     req = urllib.request.Request(f'{base}/api/v1/groups/{group_id}/locations/latest{suffix}', headers=headers)
                     try:
-                        with urllib.request.urlopen(req) as response:
+                        with urllib.request.urlopen(req, timeout=5) as response:
                             assert 'no-store' in response.headers.get('Cache-Control', '')
                             return response.status, json.load(response)
                     except urllib.error.HTTPError as error:
@@ -139,6 +166,8 @@ def main(verify=None, app_args=()):
                 assert next(item for item in items if item['userId'] == ids[2])['location'] is None
                 if verify is not None:
                     verify(sql, request, group, other_group, ids)
+                if verify_recovery is not None:
+                    verify_recovery(sql, request, restart_app, group, other_group, ids)
                 status, problem = request(ids[0], '?cursor=not-valid')
                 assert status == 400 and problem['code'] == 'INVALID_CURSOR'
                 sql(f"INSERT INTO locations(group_id,user_id,latitude,longitude,recorded_at) VALUES ('{group}','{ids[1]}',5,6,'2026-01-03T00:00:00Z');")
@@ -155,13 +184,7 @@ def main(verify=None, app_args=()):
                 assert request(ids[0])[0] == 404
                 print('PASS: invalid JWTs, membership, group isolation, live sharing, latest point, pagination and revocation')
         finally:
-            if app is not None:
-                app.terminate()
-                try:
-                    app.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    app.kill()
-                    app.wait()
+            stop_app()
             if server_started:
                 subprocess.run(['pg_ctl', '-D', str(data), '-m', 'fast', '-w', 'stop'],
                                check=True, stdout=subprocess.DEVNULL, env=safe_env)
