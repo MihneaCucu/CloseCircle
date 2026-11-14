@@ -1,6 +1,6 @@
 # CloseCircle REST API contract
 
-**Status:** Draft v0.1 — proposed for review under SCRUM-42. The route and payload proposals below are not implemented or team-approved yet. Android, React, simulator, and backend owners must review the open decisions before client implementation. The only currently implemented HTTP endpoints are `GET /actuator/health` and `GET /actuator/info`.
+**Status:** Draft v0.1 — proposed for review under SCRUM-42. Android, React, simulator, and backend owners must review the open decisions before client implementation. The `dev` baseline provides `GET /actuator/health` and `GET /actuator/info`; the SCRUM-19 development branch adds a latest-location read endpoint, described below. Other business routes are proposals.
 
 This document defines the client-facing JSON contract. It is independent of PostgreSQL table names and columns. Persisted schema changes are versioned separately with Flyway under `backend/src/main/resources/db/migration/`.
 
@@ -22,7 +22,7 @@ This document defines the client-facing JSON contract. It is independent of Post
 | Nullability | A missing optional field means “not supplied”; explicit `null` is allowed only where a schema says so |
 | CORS | Browser access is limited to the explicitly configured dashboard origin; CORS is not authentication |
 
-The backend currently has no business controllers. These are proposed paths and schemas for coordinated implementation; do not infer that a route is live from its appearance here.
+The SCRUM-19 development branch implements the latest-location read route described below. The remaining business routes are proposals for coordinated implementation; do not infer that a route is live from its appearance here. This contract remains a draft pending team review.
 
 ## 2. Authentication and access model
 
@@ -300,6 +300,8 @@ For v1, `sharingEnabled=false` suppresses all location visibility for the caller
 
 `accuracyM` may be omitted or `null`; if present it must be finite and non-negative. `recordedAt` is required and may not be more than five minutes in the future (proposed clock-skew allowance). The server derives the user from JWT and checks membership and sharing permissions before persisting. `GET /groups/{groupId}/locations/latest` returns a page of `{userId, displayName, location}` entries, excluding the caller and any member whose sharing settings or permissions prohibit visibility. Each `location` is a `Location` object or `null` when an otherwise visible member has not uploaded a point; do not include a member whose sharing is disabled. `GET /groups/{groupId}/members/{userId}/locations` returns a page of location objects filtered by required `from` and `to` timestamps; maximum requested history range is a policy decision that must be agreed before implementation.
 
+**SCRUM-19 development branch:** the latest-location route requires current group membership and returns `404` for a nonexistent or inaccessible group. It includes other members only when both `sharing_enabled` and `share_live_location` are true; a missing settings row is not visible. The latest point is selected by descending `(recorded_at, location_id)`, and a visible member without a point has `location: null`. Pages use opaque cursors ordered by membership `(joined_at, user_id)` descending. The endpoint returns `Cache-Control: no-store`. This is a read endpoint; the Android view, refresh mechanism, location upload, and team-approved privacy/retention decisions remain outstanding.
+
 `LatestLocation` example:
 
 ```json
@@ -406,7 +408,7 @@ Collection responses use:
 }
 ```
 
-`limit` is optional, defaults to 50, and is clamped to 1–100. `cursor` is an opaque server-issued string; clients pass it back unchanged and do not construct or interpret it. A missing `nextCursor` means the collection is complete. `unreadOnly` accepts only `true` or `false`. Invitation `status` accepts one of the enum values above. Location history requires `from` and `to` in RFC 3339 UTC, with `from < to`; `limit`/`cursor` paginate within that interval. Stable ordering is ascending `(recordedAt, locationId)` for history and descending `(createdAt, id)` for other collections. Exact time-window and retention limits remain open decisions.
+`limit` is optional, defaults to 50, and is clamped to 1–100. `cursor` is an opaque server-issued string; clients pass it back unchanged and do not construct or interpret it. A missing `nextCursor` means the collection is complete. `unreadOnly` accepts only `true` or `false`. Invitation `status` accepts one of the enum values above. Location history requires `from` and `to` in RFC 3339 UTC, with `from < to`; `limit`/`cursor` paginate within that interval. Stable ordering is ascending `(recordedAt, locationId)` for history and descending `(createdAt, id)` for other collections, except latest member locations as specified above. Exact time-window and retention limits remain open decisions.
 
 ## 6. Errors and HTTP status codes
 
