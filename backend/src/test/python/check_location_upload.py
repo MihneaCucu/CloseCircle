@@ -39,6 +39,7 @@ def verify(sql, latest, restart, base, token, group, other_group, ids):
 
     assert upload(user=None)[0] == 401
     assert upload(bearer=token('invalid-subject'))[0] == 401
+    assert upload(bearer=token('0-0-0-0-2'))[0] == 401
     assert upload(user=ids[6])[0] == 404
     assert upload(group_id=other_group, user=ids[0])[0] == 404
     for user in (ids[2], ids[3], ids[4], ids[5]):
@@ -70,6 +71,9 @@ def verify(sql, latest, restart, base, token, group, other_group, ids):
         results = list(pool.map(lambda _: upload(key=concurrent_key), range(2)))
     assert sorted(status for status, _ in results) == [200, 201]
     assert results[0][1]['locationId'] == results[1][1]['locationId']
+    sql(f"DO $$ BEGIN IF (SELECT count(*) FROM locations WHERE group_id='{group}' "
+        f"AND user_id='{ids[1]}' AND client_upload_id='{concurrent_key}') <> 1 THEN "
+        "RAISE EXCEPTION 'Concurrent retry inserted more than one point'; END IF; END $$;")
 
     # The same client key is scoped to a group and authenticated member.
     assert upload(group_id=other_group, key=retry_key)[0] == 201

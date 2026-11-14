@@ -55,7 +55,8 @@ public class LocationUploadService {
         policy.validate(request.recordedAt(), shares.getFirst().updatedAt(), receivedAt);
         if (uploadKey != null) {
             List<LatestLocationService.Location> previous = jdbc.query("""
-                    SELECT * FROM locations WHERE group_id = ? AND user_id = ? AND client_upload_id = ?
+                    SELECT location_id, group_id, user_id, latitude, longitude, accuracy_m, recorded_at, received_at
+                    FROM locations WHERE group_id = ? AND user_id = ? AND client_upload_id = ?
                     """, LOCATION, groupId, userId, uploadKey);
             if (!previous.isEmpty()) {
                 var point = previous.getFirst();
@@ -72,7 +73,8 @@ public class LocationUploadService {
         var location = jdbc.queryForObject("""
                 INSERT INTO locations(location_id, group_id, user_id, latitude, longitude, accuracy_m,
                                       recorded_at, received_at, client_upload_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                RETURNING location_id, group_id, user_id, latitude, longitude, accuracy_m, recorded_at, received_at
                 """, LOCATION, UUID.randomUUID(), groupId, userId, request.latitude(), request.longitude(),
                 request.accuracyM(), request.recordedAt().atOffset(ZoneOffset.UTC),
                 receivedAt.atOffset(ZoneOffset.UTC), uploadKey);

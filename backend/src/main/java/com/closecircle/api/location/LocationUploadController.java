@@ -37,6 +37,7 @@ public class LocationUploadController {
         UUID userId;
         try {
             userId = UUID.fromString(jwt.getSubject());
+            if (!userId.toString().equalsIgnoreCase(jwt.getSubject())) throw new IllegalArgumentException();
         } catch (IllegalArgumentException | NullPointerException ex) {
             throw LocationUploadRequest.failure(HttpStatus.UNAUTHORIZED, "INVALID_TOKEN", "Invalid token subject");
         }
