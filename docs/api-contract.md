@@ -403,6 +403,8 @@ The SCRUM-20 branch builds on the unmerged SCRUM-19 endpoint and adds optional `
 
 An age at or below the window is recent. Older points are last-known, and missing/future points are unknown. Classification uses recording time, not receipt time, and never changes visibility. This is implemented for review on the feature branch, not deployed or team-approved. See [location-freshness.md](location-freshness.md) for configuration, tests and remaining decisions.
 
+The latest-location read endpoint rejects non-canonical JWT UUID subjects with `401 INVALID_TOKEN` and a Bearer challenge. Invalid path/query types return `400 INVALID_PARAMETER`; malformed, unrepresentable or sub-microsecond cursors return `400 INVALID_CURSOR`. These local errors use Problem Details and `Cache-Control: no-store` without echoing input values.
+
 ## 5. Pagination and filtering
 
 Collection responses use:
