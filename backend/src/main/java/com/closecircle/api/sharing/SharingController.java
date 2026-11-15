@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -42,6 +43,11 @@ public class SharingController {
 
         SharingSettings updated = sharing.update(groupId, userId, SharingUpdateRequest.parse(body));
         return ok(updated);
+    }
+
+    @DeleteMapping
+    public ResponseEntity<SharingSettings> revoke(@PathVariable UUID groupId, @AuthenticationPrincipal Jwt jwt) {
+        return ok(sharing.revoke(groupId, userId(jwt)));
     }
 
     static UUID userId(Jwt jwt) {

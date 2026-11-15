@@ -46,9 +46,12 @@ public class SharingService {
             throw notFound();
         }
 
+        // clock_timestamp() is the moment of the write, after the membership lock was acquired, not the
+        // transaction start. Recordings made while this request waited for the lock therefore stay before
+        // the consent boundary and are rejected by uploads.
         return jdbc.queryForObject("""
                 INSERT INTO shares (group_id, user_id, sharing_enabled, share_live_location, updated_at)
-                VALUES (?, ?, ?, ?, now())
+                VALUES (?, ?, ?, ?, clock_timestamp())
                 ON CONFLICT (group_id, user_id) DO UPDATE
                 SET sharing_enabled = EXCLUDED.sharing_enabled,
                     share_live_location = EXCLUDED.share_live_location,
@@ -58,6 +61,11 @@ public class SharingService {
                         THEN EXCLUDED.updated_at ELSE shares.updated_at END
                 RETURNING group_id, user_id, sharing_enabled, share_live_location, updated_at
                 """, SETTINGS, groupId, userId, request.sharingEnabled(), request.shareLiveLocation());
+    }
+
+    @Transactional
+    public SharingSettings revoke(UUID groupId, UUID userId) {
+        return update(groupId, userId, new SharingUpdateRequest(false, false));
     }
 
     private static ResponseStatusException notFound() {
