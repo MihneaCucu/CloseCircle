@@ -4,7 +4,7 @@ on:
   push:
     branches: [dev, main]
   pull_request:
-    branches: [dev, main]
+    branches: [dev, main, 'feature/SCRUM-*']
   workflow_dispatch:
 
 permissions:
@@ -42,6 +42,10 @@ jobs:
       - name: Verify location access against PostgreSQL
         working-directory: backend
         run: python3 src/test/python/check_latest_locations.py
+
+      - name: Verify location freshness against PostgreSQL
+        working-directory: backend
+        run: python3 src/test/python/check_location_freshness.py
 
       - name: Build backend Docker image
         run: docker build --tag closecircle-api:ci --file backend/Dockerfile backend
