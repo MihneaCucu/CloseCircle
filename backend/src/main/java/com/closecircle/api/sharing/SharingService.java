@@ -74,7 +74,8 @@ public class SharingService {
                           OR shares.share_live_location <> EXCLUDED.share_live_location
                           OR shares.expires_at IS DISTINCT FROM EXCLUDED.expires_at
                         THEN EXCLUDED.updated_at ELSE shares.updated_at END
-                RETURNING """ + COLUMNS,
+                RETURNING
+                """ + COLUMNS,
                 SETTINGS, groupId, userId, request.sharingEnabled(), request.shareLiveLocation(),
                 request.durationMinutes());
     }
