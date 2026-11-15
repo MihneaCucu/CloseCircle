@@ -16,6 +16,13 @@ import org.springframework.http.HttpStatus;
  * Clients receive it as an opaque Base64 string and must not build it themselves.
  */
 public record KeysetCursor(Instant createdAt, UUID id) {
+    // PostgreSQL's timestamptz range: 4713 BC to 294276 AD (same bounds as LatestLocationService).
+    // Java's Instant reaches much further; a value outside this range made the query fail with a 500.
+    private static final Instant MIN_TIME = Instant.parse("-4713-11-24T00:00:00Z");
+    private static final Instant END_TIME = Instant.parse("+294277-01-01T00:00:00Z"); // exclusive
+
+    /** Far longer than any cursor we issue; rejected before decoding. */
+    private static final int MAX_LENGTH = 200;
 
     public String encode() {
         String raw = createdAt + "|" + id;
@@ -27,14 +34,25 @@ public record KeysetCursor(Instant createdAt, UUID id) {
         if (encoded == null) {
             return null;
         }
+        if (encoded.length() > MAX_LENGTH) {
+            throw new InvalidCursorException();
+        }
         try {
             String raw = new String(Base64.getUrlDecoder().decode(encoded), StandardCharsets.UTF_8);
             int separator = raw.indexOf('|');
             if (separator < 0) {
                 throw new InvalidCursorException();
             }
-            return new KeysetCursor(Instant.parse(raw.substring(0, separator)),
-                    UUID.fromString(raw.substring(separator + 1)));
+            Instant createdAt = Instant.parse(raw.substring(0, separator));
+            String rawId = raw.substring(separator + 1);
+            UUID id = UUID.fromString(rawId);
+            // Reject anything we could never have issued, so the query only receives valid values.
+            if (createdAt.isBefore(MIN_TIME) || !createdAt.isBefore(END_TIME)
+                    || createdAt.getNano() % 1000 != 0             // finer than PostgreSQL's microseconds
+                    || !id.toString().equalsIgnoreCase(rawId)) {   // non-canonical, e.g. "0-0-0-0-1"
+                throw new InvalidCursorException();
+            }
+            return new KeysetCursor(createdAt, id);
         } catch (IllegalArgumentException | DateTimeParseException e) {
             throw new InvalidCursorException();
         }

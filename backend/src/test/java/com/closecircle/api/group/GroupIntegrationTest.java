@@ -7,7 +7,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -126,6 +128,18 @@ class GroupIntegrationTest extends PostgresIntegrationTest {
         mvc.perform(get("/api/v1/groups").header("Authorization", alex.bearer()).param("limit", "abc"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_PARAMETER"));
+    }
+
+    @Test
+    void cursorOutsidePostgresTimestampRangeIsABadRequestNotAServerError() throws Exception {
+        TestUser alex = registerUser("Alex");
+        // Well-formed, but PostgreSQL cannot store this timestamp. It used to reach the query and fail with 500.
+        String cursor = Base64.getUrlEncoder().withoutPadding().encodeToString(
+                ("+294277-01-01T00:00:00Z|" + UUID.randomUUID()).getBytes(StandardCharsets.UTF_8));
+
+        mvc.perform(get("/api/v1/groups").header("Authorization", alex.bearer()).param("cursor", cursor))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_CURSOR"));
     }
 
     private ResultActions createGroup(TestUser user, String name) throws Exception {
