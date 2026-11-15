@@ -51,6 +51,10 @@ jobs:
         working-directory: backend
         run: python3 src/test/python/check_location_accuracy.py
 
+      - name: Verify last-known location recovery against PostgreSQL
+        working-directory: backend
+        run: python3 src/test/python/check_location_recovery.py
+
       - name: Build backend Docker image
         run: docker build --tag closecircle-api:ci --file backend/Dockerfile backend
 
