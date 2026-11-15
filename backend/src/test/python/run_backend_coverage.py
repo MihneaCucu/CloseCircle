@@ -18,7 +18,8 @@ ROOT = Path(__file__).resolve().parents[4]
 JACOCO = '0.8.14'
 SUITES = ('check_latest_locations.py', 'check_location_freshness.py',
           'check_location_accuracy.py', 'check_location_recovery.py', 'check_location_upload.py',
-          'check_group_sharing.py', 'check_sharing_revocation.py')
+          'check_group_sharing.py', 'check_sharing_revocation.py',
+          'check_temporary_sharing.py', 'check_shared_groups.py')
 
 
 def revision(path):

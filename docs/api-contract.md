@@ -1,6 +1,6 @@
 # CloseCircle REST API contract
 
-**Status:** Draft v0.1 — proposed for review under SCRUM-42. Android, React, simulator, and backend owners must review the open decisions before client implementation. The `dev` baseline includes infrastructure health/info, latest-member-location reads and own-location uploads, with optional freshness/accuracy metadata. PRs #1-5 were reviewed and merged on 15 November 2026. The SCRUM-15 per-group sharing settings routes (`GET`/`PUT`/`DELETE /api/v1/groups/{groupId}/me/sharing`, SCRUM-15/16) are implemented on their feature branch. Other business routes remain proposals until their owners integrate them.
+**Status:** Draft v0.1 — proposed for review under SCRUM-42. Android, React, simulator, and backend owners must review the open decisions before client implementation. The `dev` baseline includes infrastructure health/info, latest-member-location reads and own-location uploads, with optional freshness/accuracy metadata. PRs #1-5 were reviewed and merged on 15 November 2026. The SCRUM-15 per-group sharing settings routes (`GET`/`PUT`/`DELETE /api/v1/groups/{groupId}/me/sharing` and `GET /api/v1/users/me/sharing`, SCRUM-15/16/17/18) are implemented on their feature branch. Other business routes remain proposals until their owners integrate them.
 
 For the merged SCRUM-19/20/21/22/43 location backend, use the [machine-readable integration contract](contracts/README.md). It records tested read/upload behavior, including configurable metadata, offset timestamp normalization, conservative consent checks and idempotent retries. It is a review draft; these routes are implemented in this checkout, while deployed availability and client acceptance must be checked separately. Its feature details take precedence over older location proposals below for integration testing, without implying team approval.
 
@@ -98,6 +98,7 @@ All other current backend routes require a valid Bearer JWT. The business routes
 | `POST /invitations/accept` | User JWT | User | `AcceptInvitationRequest` | `200 Membership` |
 | `PUT /groups/{groupId}/me/sharing` | Group member | User | UUID `groupId`; `UpdateSharingRequest` | `200 SharingPreferences` |
 | `DELETE /groups/{groupId}/me/sharing` | Group member | User | UUID `groupId` | `200 SharingPreferences` |
+| `GET /users/me/sharing` | User JWT | User | None | `200 SharedGroups` |
 | `POST /groups/{groupId}/locations` | Group member | User | UUID `groupId`; `CreateLocationRequest` | `201 Location` |
 | `GET /groups/{groupId}/locations/latest` | Group member | User, Admin | UUID `groupId`; `limit`, `cursor` | `200 Page<LatestLocation>` |
 | `GET /groups/{groupId}/members/{userId}/locations` | Group member | User, Admin | UUIDs; required `from`, `to`; `limit`, `cursor` | `200 Page<Location>` |
@@ -284,6 +285,8 @@ Expired, revoked, already-used, or email-mismatched tokens return `400` with a s
 - `updatedAt` changes only when a flag changes, so repeating the same `PUT` is idempotent. It is the consent boundary used by uploads (`403 LOCATION_CONSENT_CHANGED` for older recordings).
 - Responses use `Cache-Control: no-store`.
 - **SCRUM-16 / T-10:** `DELETE /groups/{groupId}/me/sharing` revokes sharing in one call (both flags `false`, idempotent). The first location read after it returns no longer includes the caller, and later uploads, retries and recordings from before the revocation are refused. See [group-sharing.md](group-sharing.md#immediate-revocation-scrum-16).
+- **SCRUM-17 / T-11:** `PUT` accepts an optional `durationMinutes` (integer 1-10080, only with `sharingEnabled: true`), and responses include `expiresAt` (`null` = no time limit). From `expiresAt` onwards the caller is treated as not sharing everywhere: hidden from location reads, uploads refused, `GET` reports `sharingEnabled: false`. `DELETE` or `PUT` without a duration clears it. See [group-sharing.md](group-sharing.md#temporary-sharing-scrum-17).
+- **SCRUM-18 / T-17:** `GET /users/me/sharing` returns `{"items": [...]}` with every group that can currently see the caller's location (both flags on, not expired), sorted by name. Each item has `groupId`, `groupName`, `expiresAt`, `remainingSeconds` (server-computed, rounded up; `null` without a time limit) and `updatedAt`. See [group-sharing.md](group-sharing.md#groups-i-share-with-scrum-18).
 
 For v1, `sharingEnabled=false` suppresses all location visibility for the caller; `shareLiveLocation=false` suppresses live location while retaining only history that the user has explicitly agreed may be retained. Whether the API accepts or rejects location uploads while sharing is disabled, and how long history is retained, are blocking privacy decisions and remain unapproved.
 

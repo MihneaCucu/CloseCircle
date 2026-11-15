@@ -1,9 +1,11 @@
-# Per-group location sharing (SCRUM-15 / T-04, SCRUM-16 / T-10)
+# Per-group location sharing (SCRUM-15 / T-04, SCRUM-16 / T-10, SCRUM-17 / T-11, SCRUM-18 / T-17)
 
 User stories:
 
 - SCRUM-15: as a member, I want to turn location sharing on or off separately for each group, so that I control who can see my location.
 - SCRUM-16: as a member, I want to revoke location sharing immediately, so that the others no longer see my location.
+- SCRUM-17: as a member, I want to share my location for a limited time, so that sharing stops automatically.
+- SCRUM-18: as a member, I want to see the list of groups I share my location with, so that I have a clear picture of who has access.
 
 ## Endpoints
 
@@ -12,8 +14,9 @@ All routes need a Bearer JWT. The user is always the token subject.
 | Route | Body | Success |
 | --- | --- | --- |
 | `GET /api/v1/groups/{groupId}/me/sharing` | none | `200 SharingSettings` |
-| `PUT /api/v1/groups/{groupId}/me/sharing` | `{"sharingEnabled": bool, "shareLiveLocation": bool}` | `200 SharingSettings` |
+| `PUT /api/v1/groups/{groupId}/me/sharing` | `{"sharingEnabled": bool, "shareLiveLocation": bool, "durationMinutes": int?}` | `200 SharingSettings` |
 | `DELETE /api/v1/groups/{groupId}/me/sharing` | none | `200 SharingSettings` (both flags `false`) |
+| `GET /api/v1/users/me/sharing` | none | `200 SharedGroups` |
 
 ```json
 {
@@ -21,6 +24,7 @@ All routes need a Bearer JWT. The user is always the token subject.
   "userId": "00000000-0000-0000-0000-000000000006",
   "sharingEnabled": true,
   "shareLiveLocation": true,
+  "expiresAt": "2026-11-15T11:30:00.123456Z",
   "updatedAt": "2026-11-15T10:30:00.123456Z"
 }
 ```
@@ -55,9 +59,51 @@ Concurrency: `PUT` locks the membership row before writing, in the same order as
 
 Stored points are not deleted on revocation. They stay hidden while sharing is off. After re-enabling, the last point sent before the revocation is visible again until a new one arrives. Deleting history is a separate, open retention decision.
 
+## Temporary sharing (SCRUM-17)
+
+1. **Choose a duration:** add `"durationMinutes"` to `PUT`, a whole number from 1 to 10080 (7 days). It is only allowed when `sharingEnabled` is `true`. Omitting it, or sending `null`, means no time limit. The server computes `expiresAt` from its own clock as exactly `updatedAt` plus the duration, so a wrong phone clock does not matter. Sending a new duration replaces the old one, which extends or shortens the period. A `PUT` without a duration makes sharing unlimited again.
+2. **Stops automatically:** sharing is active only while `expiresAt` is `null` or in the future. The latest-locations read, uploads and `GET .../me/sharing` all apply this rule at the database clock, so sharing stops exactly at the expiry without a background job and survives restarts. After expiry, `GET` returns `sharingEnabled: false` and keeps `expiresAt` so the app can show when it ended. Uploads get `403 LOCATION_SHARING_DISABLED`, including recordings time-stamped after the expiry under a future clock tolerance.
+3. **Stop manually before expiry:** `DELETE` (SCRUM-16) or `PUT` with `"sharingEnabled": false`. Both clear `expiresAt`.
+
+`updatedAt` also changes when the expiry changes. Sharing again after an expiry therefore starts a new consent period, and recordings made while sharing had stopped are refused with `403 LOCATION_CONSENT_CHANGED`. As a consequence, repeating a `PUT` with a duration is not idempotent: it starts a new period each time.
+
+The database row keeps `sharing_enabled = true` after expiry. Any new code that reads `shares` (for example SCRUM-18) must apply the same `expires_at` rule.
+
+## Groups I share with (SCRUM-18)
+
+`GET /api/v1/users/me/sharing` lists the groups that can see the caller's location right now:
+
+```json
+{
+  "items": [
+    {
+      "groupId": "10000000-0000-0000-0000-000000000002",
+      "groupName": "Other",
+      "expiresAt": null,
+      "remainingSeconds": null,
+      "updatedAt": "2026-11-15T10:00:00Z"
+    },
+    {
+      "groupId": "10000000-0000-0000-0000-000000000001",
+      "groupName": "Test",
+      "expiresAt": "2026-11-15T11:30:00.123456Z",
+      "remainingSeconds": 1795,
+      "updatedAt": "2026-11-15T11:00:00.123456Z"
+    }
+  ]
+}
+```
+
+1. **All groups with active sharing:** a group is listed only while both flags are `true` and sharing has not expired. This is the same rule the latest-locations read uses, so the list matches exactly which groups can see the location. Groups where sharing is off, live location is off, it has expired, or preferences were never saved are not listed. The list is sorted by group name.
+2. **Remaining time for temporary sharing:** `expiresAt` and `remainingSeconds` (whole seconds, rounded up, at least `1`). The server computes `remainingSeconds` from its own clock, so the app can count down from it without trusting the phone's clock. Both are `null` for sharing without a time limit. An expired group disappears from the list without any request from the user.
+
+The list is not paginated, since a user belongs to few groups. The caller always comes from the JWT; there is no way to list another user's groups.
+
 ## Tests
 
 - `SharingRequestTest` (JUnit, `mvn verify`): strict body parsing and JWT subject handling.
+- `src/test/python/check_shared_groups.py` (CI, disposable PostgreSQL). It checks: authentication; that exactly the active groups are listed (and that this matches what other members actually see); sorting; the remaining time and its countdown; that an expired group drops out; manual changes; persistence across an API and database restart; and leaving a group.
+- `src/test/python/check_temporary_sharing.py` (CI, disposable PostgreSQL, 60 s upload clock tolerance). It checks: the expiry computed from the chosen duration; invalid durations; the automatic stop at expiry (visibility, `GET` and uploads); that the other group is unaffected; persistence across an API and database restart; that recordings from the stopped period are refused after sharing again; refused recordings time-stamped after the expiry; manual stop with `DELETE` and `PUT`; and extending or removing the time limit.
 - `src/test/python/check_sharing_revocation.py` (CI, disposable PostgreSQL). It checks: authentication and `404`; that the first read after `DELETE` hides the user; refused new uploads, retries and queued recordings; that no point is stored after revocation; that the other group is unaffected; idempotent `DELETE`; persistence across an API and database restart; refused pre-revocation recordings after re-enabling; and revoking while uploads run concurrently.
 - `src/test/python/check_group_sharing.py` (CI, disposable PostgreSQL). It runs over real HTTP and checks: authentication; `404` for non-members and missing groups; validation; the default of not sharing; turning sharing on/off and how that changes visibility and uploads; that each flag hides the member on its own; that repeating the same `PUT` is idempotent; isolation between two groups in both directions; persistence across an API and database restart; and that settings are dropped when a member leaves.
 
@@ -66,11 +112,13 @@ Run locally from `backend/`:
 ```sh
 mvn -q -DskipTests package && python3 src/test/python/check_group_sharing.py
 python3 src/test/python/check_sharing_revocation.py
+python3 src/test/python/check_temporary_sharing.py
+python3 src/test/python/check_shared_groups.py
 ```
 
 ## Out of scope
 
-- Listing the groups I share with (SCRUM-18) and temporary sharing (SCRUM-17).
+- Notifying the user or the group when temporary sharing expires.
 - Pushing revocations to other members' apps in real time (there is no push channel; apps see it on their next request).
 - Android/React UI for the toggle.
 - Whether locations recorded while sharing is off are retained (an open team privacy decision).
