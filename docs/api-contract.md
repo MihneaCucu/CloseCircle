@@ -1,6 +1,6 @@
 # CloseCircle REST API contract
 
-**Status:** Draft v0.1 — proposed for review under SCRUM-42. The route and payload proposals below are not implemented or team-approved yet. Android, React, simulator, and backend owners must review the open decisions before client implementation. The only currently implemented HTTP endpoints are `GET /actuator/health` and `GET /actuator/info`.
+**Status:** Draft v0.1 — proposed for review under SCRUM-42. The route and payload proposals below are not implemented or team-approved yet. Android, React, simulator, and backend owners must review the open decisions before client implementation. Currently implemented HTTP endpoints: `GET /actuator/health`, `GET /actuator/info`, and (SCRUM-41) `POST /api/v1/auth/register`, `POST /api/v1/auth/login` and `GET /api/v1/users/me`.
 
 This document defines the client-facing JSON contract. It is independent of PostgreSQL table names and columns. Persisted schema changes are versioned separately with Flyway under `backend/src/main/resources/db/migration/`.
 
@@ -26,7 +26,7 @@ The backend currently has no business controllers. These are proposed paths and 
 
 ## 2. Authentication and access model
 
-The infrastructure currently verifies HS256 signatures and issuer `closecircle`; token issuance and authorization claim mapping are not implemented. The proposed contract requires `sub`, `iat`, and `exp` claims, but the backend must explicitly require them when token issuance is implemented. Password policy, token lifetime, and authorization claim mapping require approval (see [Open decisions](#10-open-decisions-for-scrum-42-review)).
+Registration and login issue HS256 access tokens signed with `JWT_SECRET` (SCRUM-41). Every protected request is checked for a valid signature, issuer `closecircle`, an `exp` that has not passed, and a canonical UUID `sub`; a token missing `exp` or `sub` is rejected. Tokens are valid for 1 hour by default (`JWT_ACCESS_TOKEN_TTL`, e.g. `30m`, `1h`). After expiry, protected routes return `401` and the client must log in again. Authorization claim mapping (group roles) remains open (see [Open decisions](#10-open-decisions-for-scrum-42-review)).
 
 Proposed access token claims:
 
@@ -142,7 +142,8 @@ The examples in this section are normative shapes for the draft contract. All na
 `GroupSummary` is `{groupId, name, createdBy, createdAt, myRole, memberCount}`. `GroupDetails` contains the same fields. In a member-list response, each `Member` is `{userId, displayName, role, joinedAt}`. `myRole` describes only the caller's membership and must not be trusted by the server for authorization.
 
 - `email`: trim surrounding whitespace, validate as an email address, maximum 320 characters; comparisons are case-insensitive. Registration uniqueness conflicts return `409`.
-- `password`: never echoed or logged; minimum 12 characters is proposed, with a maximum of 128 characters. Password hashing and any breach screening are backend responsibilities. The minimum requires team approval.
+- `password`: never echoed or logged; minimum 12 characters and maximum 72 bytes in UTF-8 (BCrypt ignores anything longer, so longer passwords are rejected rather than silently truncated). Stored only as a BCrypt hash. Breach screening is not implemented.
+- Login with an unknown email or a wrong password returns the same `401 INVALID_CREDENTIALS` body, so the response does not reveal whether an account exists. Registration with an existing email (compared case-insensitively) returns `409 EMAIL_ALREADY_REGISTERED`.
 - `displayName`, group `name`, zone `name`: non-empty after trimming; proposed maximum 100 characters.
 - `role`: exactly `OWNER`, `ADMIN`, or `MEMBER`; clients cannot assign `OWNER` through member-management routes.
 - Path parameters ending in `Id` must parse as UUIDs; invalid UUIDs return `400`.
@@ -494,7 +495,7 @@ Sensitive-data rules apply end to end: do not log request bodies, Authorization 
 | Decision | Current proposal | Owner(s) to confirm | Blocks |
 | --- | --- | --- | --- |
 | Registration and login | Email + password; JWT access token; no refresh/logout endpoint in v1 | Backend, Android | Auth implementation |
-| Password policy and token lifetime | Password minimum 12 characters; JWT duration to be selected; no revocation without state | Backend, security | Auth implementation |
+| Password policy and token lifetime | **Implemented in SCRUM-41:** password 12 characters to 72 UTF-8 bytes; 1-hour access token, configurable; no revocation without state | Backend, security | — |
 | Email verification and invite delivery | One-time hashed invitation token; delivery channel/provider not selected | Product, backend | Invitations |
 | Owner transfer and group deletion | Owner-only deletion; owner must transfer before leaving; deletion retention behavior TBD | Product, backend | Group administration |
 | Role capabilities | Matrix in section 2; owner-only role changes and atomic transfer proposed | Product, Android, backend | Authorization and admin UI |

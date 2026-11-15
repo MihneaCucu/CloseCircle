@@ -32,7 +32,10 @@ spring:
 
 closecircle:
   jwt:
-    secret: ${JWT_SECRET:local-development-only-change-this-32-byte-secret}
+    # No fallback value: startup fails unless JWT_SECRET is set (see SecurityConfig).
+    secret: ${JWT_SECRET:}
+    # How long an access token stays valid; clients log in again after it expires.
+    access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:1h}
 
 management:
   endpoints:
