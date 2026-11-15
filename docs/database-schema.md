@@ -167,8 +167,11 @@ Creating a membership does not automatically create a `shares` row. The `TRUE` d
 | `accuracy_m` | `DOUBLE PRECISION` | Nullable; if set, must be non-negative. Unit is metres. |
 | `recorded_at` | `TIMESTAMPTZ` | Required; time supplied for when the location was recorded. |
 | `received_at` | `TIMESTAMPTZ` | Required; defaults to current time when received by the server. |
+| `client_upload_id` | `UUID` | Nullable internal retry key added by V2 on the SCRUM-43 branch; unique together with group and user when supplied. Not an API response field. |
 
 An index supports reading a member's locations in a group ordered by `recorded_at` descending. The schema has no PostGIS geometry column; coordinates are stored as numeric latitude/longitude.
+
+`V2__location_upload_idempotency.sql` adds the retry column and unique constraint without changing V1 or existing rows. The upload API generates its UUID and receipt time explicitly; SQL fixture inserts may still use the database defaults. The migration is branch-only until reviewed and merged.
 
 ### `zones`
 
