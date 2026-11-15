@@ -17,6 +17,10 @@ local.properties
 **/dist/
 **/.vite/
 
+# Python regression checks
+__pycache__/
+*.py[cod]
+
 # macOS
 .DS_Store
 .neon
@@ -27,3 +31,6 @@ local.properties
 skills-lock.json
 
 node_modules/
+
+# Local contract validation environment
+.venv-contract/

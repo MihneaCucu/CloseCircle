@@ -1,6 +1,9 @@
 package com.closecircle.api.config;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.startsWith;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -57,7 +60,25 @@ class SecurityConfigTest {
     void requestWithoutTokenIsRejected() throws Exception {
         mvc.perform(get(ME))
                 .andExpect(status().isUnauthorized())
-                .andExpect(header().string("WWW-Authenticate", "Bearer"));
+                .andExpect(header().string("WWW-Authenticate", "Bearer"))
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
+    }
+
+    @Test
+    void rejectedTokenGetsAProblemDetailsBody() throws Exception {
+        // Teammates' checks rely on this body: a token with a non-UUID subject is now rejected
+        // by Spring Security before any controller runs.
+        mvc.perform(get(ME).header("Authorization", bearer(SECRET, claims -> claims.subject("not-a-uuid"))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string("WWW-Authenticate", startsWith("Bearer")))
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.type").value("about:blank"))
+                .andExpect(jsonPath("$.title").value("Invalid token"))
+                .andExpect(jsonPath("$.detail").isNotEmpty())
+                .andExpect(jsonPath("$.instance").value(ME))
+                .andExpect(jsonPath("$.code").value("INVALID_TOKEN"));
     }
 
     @Test

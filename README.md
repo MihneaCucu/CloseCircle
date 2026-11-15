@@ -33,6 +33,7 @@ CloseCircle/
 
 ## Conventions
 
+- A machine-readable location API contract and automated payload checks are available in [docs/contracts/](docs/contracts/README.md), under SCRUM-42 review. The endpoints remain on their pending feature PRs.
 - The shared client–server contract lives in `docs/api-contract.md` and is reviewed by the Android, React, and backend owners.
 - `mobile/`, `backend/`, and `dashboard-admin/` are separate applications that integrate through the documented REST API.
 - PostgreSQL migrations and the code that applies them belong to the backend (`backend/src/main/resources/db/migration/` for Flyway).

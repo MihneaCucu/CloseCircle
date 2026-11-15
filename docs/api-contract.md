@@ -1,6 +1,8 @@
 # CloseCircle REST API contract
 
-**Status:** Draft v0.1 — proposed for review under SCRUM-42. The route and payload proposals below are not implemented or team-approved yet. Android, React, simulator, and backend owners must review the open decisions before client implementation. Currently implemented HTTP endpoints: `GET /actuator/health`, `GET /actuator/info`, and (SCRUM-41) `POST /api/v1/auth/register`, `POST /api/v1/auth/login` and `GET /api/v1/users/me`; (SCRUM-11) `POST /api/v1/groups` and `GET /api/v1/groups`.
+**Status:** Draft v0.1 — proposed for review under SCRUM-42. Android, React, simulator, and backend owners must review the open decisions before client implementation. The `dev` baseline includes infrastructure health/info, latest-member-location reads and own-location uploads, with optional freshness/accuracy metadata. PRs #1-5 were reviewed and merged on 15 November 2026. The SCRUM-15 per-group sharing settings routes (`GET`/`PUT`/`DELETE /api/v1/groups/{groupId}/me/sharing` and `GET /api/v1/users/me/sharing`, SCRUM-15/16/17/18) are implemented on their feature branch. SCRUM-41 adds account registration and login (`POST /api/v1/auth/register`, `POST /api/v1/auth/login`) and `GET /api/v1/users/me`; SCRUM-11 adds group creation and listing (`POST /api/v1/groups`, `GET /api/v1/groups`). Other business routes remain proposals until their owners integrate them.
+
+For the merged SCRUM-19/20/21/22/43 location backend, use the [machine-readable integration contract](contracts/README.md). It records tested read/upload behavior, including configurable metadata, offset timestamp normalization, conservative consent checks and idempotent retries. It is a review draft; these routes are implemented in this checkout, while deployed availability and client acceptance must be checked separately. Its feature details take precedence over older location proposals below for integration testing, without implying team approval.
 
 This document defines the client-facing JSON contract. It is independent of PostgreSQL table names and columns. Persisted schema changes are versioned separately with Flyway under `backend/src/main/resources/db/migration/`.
 
@@ -22,11 +24,11 @@ This document defines the client-facing JSON contract. It is independent of Post
 | Nullability | A missing optional field means “not supplied”; explicit `null` is allowed only where a schema says so |
 | CORS | Browser access is limited to the explicitly configured dashboard origin; CORS is not authentication |
 
-The backend currently has no business controllers. These are proposed paths and schemas for coordinated implementation; do not infer that a route is live from its appearance here.
+The merged backend implements the latest-location read and upload routes described below. The remaining business routes are proposals for coordinated implementation; do not infer that a route is live from its appearance here. This contract remains a draft pending team review.
 
 ## 2. Authentication and access model
 
-Registration and login issue HS256 access tokens signed with `JWT_SECRET` (SCRUM-41). Every protected request is checked for a valid signature, issuer `closecircle`, an `exp` that has not passed, and a canonical UUID `sub`; a token missing `exp` or `sub` is rejected. Tokens are valid for 1 hour by default (`JWT_ACCESS_TOKEN_TTL`, e.g. `30m`, `1h`). After expiry, protected routes return `401` and the client must log in again. Authorization claim mapping (group roles) remains open (see [Open decisions](#10-open-decisions-for-scrum-42-review)).
+Registration and login issue HS256 access tokens signed with `JWT_SECRET` (SCRUM-41). Every protected request is checked for a valid signature, issuer `closecircle`, an `exp` that has not passed, and a canonical UUID `sub`; a token missing `exp` or `sub` is rejected. Tokens are valid for 1 hour by default (`JWT_ACCESS_TOKEN_TTL`, e.g. `30m`, `1h`). After expiry, protected routes return `401` and the client must log in again. Every `401` from authentication carries `WWW-Authenticate: Bearer` and a Problem Details body: `code` is `INVALID_TOKEN` when a token was sent but rejected (bad signature, expired, wrong issuer, missing `exp`, non-UUID `sub`), and `AUTHENTICATION_REQUIRED` when no token was sent. The body does not say which check failed. Authorization claim mapping (group roles) remains open (see [Open decisions](#10-open-decisions-for-scrum-42-review)).
 
 Proposed access token claims:
 
@@ -95,6 +97,8 @@ All other current backend routes require a valid Bearer JWT. The business routes
 | `DELETE /groups/{groupId}/invitations/{invitationId}` | Owner or Admin | User, Admin | UUIDs | `204` |
 | `POST /invitations/accept` | User JWT | User | `AcceptInvitationRequest` | `200 Membership` |
 | `PUT /groups/{groupId}/me/sharing` | Group member | User | UUID `groupId`; `UpdateSharingRequest` | `200 SharingPreferences` |
+| `DELETE /groups/{groupId}/me/sharing` | Group member | User | UUID `groupId` | `200 SharingPreferences` |
+| `GET /users/me/sharing` | User JWT | User | None | `200 SharedGroups` |
 | `POST /groups/{groupId}/locations` | Group member | User | UUID `groupId`; `CreateLocationRequest` | `201 Location` |
 | `GET /groups/{groupId}/locations/latest` | Group member | User, Admin | UUID `groupId`; `limit`, `cursor` | `200 Page<LatestLocation>` |
 | `GET /groups/{groupId}/members/{userId}/locations` | Group member | User, Admin | UUIDs; required `from`, `to`; `limit`, `cursor` | `200 Page<Location>` |
@@ -275,6 +279,18 @@ Expired, revoked, already-used, or email-mismatched tokens return `400` with a s
 }
 ```
 
+**Implemented (SCRUM-15 / T-04):** `GET` and `PUT /groups/{groupId}/me/sharing`. See [group-sharing.md](group-sharing.md) for the behaviour and tests. Summary:
+
+- The caller always comes from the JWT subject; the body cannot name another user or group (unknown fields return `400 INVALID_SHARING_REQUEST`). Both flags are required JSON booleans.
+- A caller who is not a member, or a group that does not exist, gets `404 GROUP_NOT_FOUND`. A malformed `groupId` returns `400 INVALID_PARAMETER`; an invalid token subject returns `401 INVALID_TOKEN`.
+- A member who has never saved settings is not sharing: `GET` returns both flags `false` and `updatedAt: null`.
+- Settings are stored separately for each group membership. Other members see the caller's location in a group only while both flags are `true` in that group, and uploads are accepted only under the same condition.
+- `updatedAt` changes only when a flag changes, so repeating the same `PUT` is idempotent. It is the consent boundary used by uploads (`403 LOCATION_CONSENT_CHANGED` for older recordings).
+- Responses use `Cache-Control: no-store`.
+- **SCRUM-16 / T-10:** `DELETE /groups/{groupId}/me/sharing` revokes sharing in one call (both flags `false`, idempotent). The first location read after it returns no longer includes the caller, and later uploads, retries and recordings from before the revocation are refused. See [group-sharing.md](group-sharing.md#immediate-revocation-scrum-16).
+- **SCRUM-17 / T-11:** `PUT` accepts an optional `durationMinutes` (integer 1-10080, only with `sharingEnabled: true`), and responses include `expiresAt` (`null` = no time limit). From `expiresAt` onwards the caller is treated as not sharing everywhere: hidden from location reads, uploads refused, `GET` reports `sharingEnabled: false`. `DELETE` or `PUT` without a duration clears it. See [group-sharing.md](group-sharing.md#temporary-sharing-scrum-17).
+- **SCRUM-18 / T-17:** `GET /users/me/sharing` returns `{"items": [...]}` with every group that can currently see the caller's location (both flags on, not expired), sorted by name. Each item has `groupId`, `groupName`, `expiresAt`, `remainingSeconds` (server-computed, rounded up; `null` without a time limit) and `updatedAt`. See [group-sharing.md](group-sharing.md#groups-i-share-with-scrum-18).
+
 For v1, `sharingEnabled=false` suppresses all location visibility for the caller; `shareLiveLocation=false` suppresses live location while retaining only history that the user has explicitly agreed may be retained. Whether the API accepts or rejects location uploads while sharing is disabled, and how long history is retained, are blocking privacy decisions and remain unapproved.
 
 `POST /groups/{groupId}/locations` request and response:
@@ -302,6 +318,8 @@ For v1, `sharingEnabled=false` suppresses all location visibility for the caller
 ```
 
 `accuracyM` may be omitted or `null`; if present it must be finite and non-negative. `recordedAt` is required and may not be more than five minutes in the future (proposed clock-skew allowance). The server derives the user from JWT and checks membership and sharing permissions before persisting. `GET /groups/{groupId}/locations/latest` returns a page of `{userId, displayName, location}` entries, excluding the caller and any member whose sharing settings or permissions prohibit visibility. Each `location` is a `Location` object or `null` when an otherwise visible member has not uploaded a point; do not include a member whose sharing is disabled. `GET /groups/{groupId}/members/{userId}/locations` returns a page of location objects filtered by required `from` and `to` timestamps; maximum requested history range is a policy decision that must be agreed before implementation.
+
+**Merged SCRUM-19 backend:** the latest-location route requires current group membership and returns `404` for a nonexistent or inaccessible group. It includes other members only when both `sharing_enabled` and `share_live_location` are true; a missing settings row is not visible. The latest point is selected by descending `(recorded_at, location_id)`, and a visible member without a point has `location: null`. Pages use opaque cursors ordered by membership `(joined_at, user_id)` descending. The endpoint returns `Cache-Control: no-store`. This read endpoint is paired with the merged SCRUM-43 upload handler. Android view/refresh, integration with auth/group/sharing changes, and team-approved privacy/retention decisions remain outstanding.
 
 `LatestLocation` example:
 
@@ -398,6 +416,34 @@ Precise coordinates, location payloads, authorization headers, and invitation to
 
 Allowed scenarios and controls are provisional. A simulator must use synthetic accounts and locations, have a short maximum duration, and be disabled in production. `GET` returns the same scenario object; `POST .../{scenarioId}/stop` returns `204`. The simulator must never accept a client-supplied identity as authority to write a real member's location.
 
+### Freshness metadata (SCRUM-20 merged backend)
+
+The merged SCRUM-20 implementation builds on SCRUM-19's endpoint and adds optional `freshness` to each permitted `LatestLocation` member. Set `closecircle.location.recent-for-seconds` to enable it; there is no product default, and without configuration the field is omitted. Its object is `{status, evaluatedAt, recentForSeconds}`: `status` is `RECENT`, `LAST_KNOWN`, or `UNKNOWN`; `evaluatedAt` is one server UTC timestamp shared by the response; `recentForSeconds` is the configured non-negative integer window. The existing `location.recordedAt` remains the displayed update time.
+
+An age at or below the window is recent. Older points are last-known, and missing/future points are unknown. Classification uses recording time, not receipt time, and never changes visibility. The backend code is reviewed and merged into dev; deployment, client acceptance and agreement on product settings remain separate. See [location-freshness.md](location-freshness.md) for configuration, tests and remaining decisions.
+
+### Accuracy metadata (SCRUM-22 merged backend)
+
+Building on SCRUM-20, the merged SCRUM-22 implementation adds optional `accuracy` to each permitted `LatestLocation` member. Set `closecircle.location.poor-accuracy-threshold-m` to a finite positive number of metres to enable it. With no configured threshold the field is omitted. The object is `{status, poorAccuracyThresholdM}`: `status` is `ACCEPTABLE` for finite non-negative uncertainty at or below the threshold, `POOR` above it, or `UNKNOWN` for missing/invalid uncertainty. A member with `location: null` gets `UNKNOWN`. Non-finite or negative stored uncertainty is exposed as `accuracyM: null`.
+
+Accuracy and freshness are independent and never grant visibility. The backend code is reviewed and merged into dev; deployment, client acceptance and agreement on product settings remain separate. The product threshold and Android marker remain for review and client implementation; see [location-accuracy.md](location-accuracy.md).
+
+### Last-known recovery (SCRUM-21 backend read path)
+
+The read endpoint preserves the saved point and its original timestamps when no new recording arrives, including across API/database restart. A delayed older recording does not replace a more recent recorded point; a new accepted recording is visible on the next read, subject to current membership/sharing checks. SCRUM-21 verifies these behaviours against PostgreSQL. SCRUM-43 additionally implements and verifies upload ingestion and safe retries; mobile offline caching/reconnection and a device connectivity signal remain separate. See [location-recovery.md](location-recovery.md) for coverage and the remaining end-to-end work.
+
+### Location upload (SCRUM-43 merged backend)
+
+The merged SCRUM-43 backend implements `POST /groups/{groupId}/locations` on top of the merged location-read implementation. It accepts exactly the documented latitude, longitude, nullable/optional `accuracyM` and required offset timestamp `recordedAt`; unknown fields and non-finite/out-of-range measurements return `400 INVALID_LOCATION`. Timestamps are normalized to microsecond UTC precision. Identity and receipt time are server-derived.
+
+Current membership is required (`404 GROUP_NOT_FOUND` otherwise). Missing sharing preferences or either disabled sharing flag returns `403 LOCATION_SHARING_DISABLED`. A recording before the current preference update returns `403 LOCATION_CONSENT_CHANGED`. This conservative consent-boundary rule is implemented for team review; it does not approve retention or upload while sharing is off. Future clock tolerance is configured with `closecircle.location.upload-max-future-seconds` (integer 0-300, default 0); the earlier five-minute proposal is not an implicit default.
+
+An optional UUID `Idempotency-Key` header makes retries safe within the authenticated user/group. A new write returns `201 Location`; an identical retry returns `200` with the saved representation; different payload for the same key returns `409 IDEMPOTENCY_CONFLICT`. Authorization is rechecked on retries. Without a key, repeated POSTs create separate recordings. New upload responses use `Cache-Control: no-store`; older recorded points never replace newer ones in the latest-location read.
+
+This backend is reviewed, merged and tested; deployment and whole-story acceptance remain separate. See [location-upload.md](location-upload.md) for error, configuration, migration and test details, and [checkpoint-2-readiness.md](checkpoint-2-readiness.md) for the story-count boundary.
+
+The latest-location read endpoint rejects non-canonical JWT UUID subjects with `401 INVALID_TOKEN` and a Bearer challenge. Invalid path/query types return `400 INVALID_PARAMETER`; malformed, unrepresentable or sub-microsecond cursors return `400 INVALID_CURSOR`. These local errors use Problem Details and `Cache-Control: no-store` without echoing input values.
+
 ## 5. Pagination and filtering
 
 Collection responses use:
@@ -409,7 +455,7 @@ Collection responses use:
 }
 ```
 
-`limit` is optional, defaults to 50, and is clamped to 1–100. `cursor` is an opaque server-issued string; clients pass it back unchanged and do not construct or interpret it. A missing `nextCursor` means the collection is complete. `unreadOnly` accepts only `true` or `false`. Invitation `status` accepts one of the enum values above. Location history requires `from` and `to` in RFC 3339 UTC, with `from < to`; `limit`/`cursor` paginate within that interval. Stable ordering is ascending `(recordedAt, locationId)` for history and descending `(createdAt, id)` for other collections. Exact time-window and retention limits remain open decisions.
+`limit` is optional, defaults to 50, and is clamped to 1–100. `cursor` is an opaque server-issued string; clients pass it back unchanged and do not construct or interpret it. A missing `nextCursor` means the collection is complete. `unreadOnly` accepts only `true` or `false`. Invitation `status` accepts one of the enum values above. Location history requires `from` and `to` in RFC 3339 UTC, with `from < to`; `limit`/`cursor` paginate within that interval. Stable ordering is ascending `(recordedAt, locationId)` for history and descending `(createdAt, id)` for other collections, except latest member locations as specified above. Exact time-window and retention limits remain open decisions.
 
 ## 6. Errors and HTTP status codes
 
