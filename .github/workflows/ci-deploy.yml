@@ -59,6 +59,10 @@ jobs:
         working-directory: backend
         run: python3 src/test/python/check_location_upload.py
 
+      - name: Verify per-group sharing settings against PostgreSQL
+        working-directory: backend
+        run: python3 src/test/python/check_group_sharing.py
+
       - name: Build backend Docker image
         run: docker build --tag closecircle-api:ci --file backend/Dockerfile backend
 

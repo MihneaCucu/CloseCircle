@@ -1,6 +1,6 @@
 # CloseCircle REST API contract
 
-**Status:** Draft v0.1 — proposed for review under SCRUM-42. Android, React, simulator, and backend owners must review the open decisions before client implementation. The `dev` baseline includes infrastructure health/info, latest-member-location reads and own-location uploads, with optional freshness/accuracy metadata. PRs #1-5 were reviewed and merged on 15 November 2026. Other business routes remain proposals until their owners integrate them.
+**Status:** Draft v0.1 — proposed for review under SCRUM-42. Android, React, simulator, and backend owners must review the open decisions before client implementation. The `dev` baseline includes infrastructure health/info, latest-member-location reads and own-location uploads, with optional freshness/accuracy metadata. PRs #1-5 were reviewed and merged on 15 November 2026. The SCRUM-15 per-group sharing settings routes (`GET`/`PUT /api/v1/groups/{groupId}/me/sharing`) are implemented on their feature branch. Other business routes remain proposals until their owners integrate them.
 
 For the merged SCRUM-19/20/21/22/43 location backend, use the [machine-readable integration contract](contracts/README.md). It records tested read/upload behavior, including configurable metadata, offset timestamp normalization, conservative consent checks and idempotent retries. It is a review draft; these routes are implemented in this checkout, while deployed availability and client acceptance must be checked separately. Its feature details take precedence over older location proposals below for integration testing, without implying team approval.
 
@@ -273,6 +273,15 @@ Expired, revoked, already-used, or email-mismatched tokens return `400` with a s
   "updatedAt": "2026-10-25T10:30:00Z"
 }
 ```
+
+**Implemented (SCRUM-15 / T-04):** `GET` and `PUT /groups/{groupId}/me/sharing`. See [group-sharing.md](group-sharing.md) for the behaviour and tests. Summary:
+
+- The caller always comes from the JWT subject; the body cannot name another user or group (unknown fields return `400 INVALID_SHARING_REQUEST`). Both flags are required JSON booleans.
+- A caller who is not a member, or a group that does not exist, gets `404 GROUP_NOT_FOUND`. A malformed `groupId` returns `400 INVALID_PARAMETER`; an invalid token subject returns `401 INVALID_TOKEN`.
+- A member who has never saved settings is not sharing: `GET` returns both flags `false` and `updatedAt: null`.
+- Settings are stored separately for each group membership. Other members see the caller's location in a group only while both flags are `true` in that group, and uploads are accepted only under the same condition.
+- `updatedAt` changes only when a flag changes, so repeating the same `PUT` is idempotent. It is the consent boundary used by uploads (`403 LOCATION_CONSENT_CHANGED` for older recordings).
+- Responses use `Cache-Control: no-store`.
 
 For v1, `sharingEnabled=false` suppresses all location visibility for the caller; `shareLiveLocation=false` suppresses live location while retaining only history that the user has explicitly agreed may be retained. Whether the API accepts or rejects location uploads while sharing is disabled, and how long history is retained, are blocking privacy decisions and remain unapproved.
 

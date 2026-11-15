@@ -17,7 +17,8 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[4]
 JACOCO = '0.8.14'
 SUITES = ('check_latest_locations.py', 'check_location_freshness.py',
-          'check_location_accuracy.py', 'check_location_recovery.py', 'check_location_upload.py')
+          'check_location_accuracy.py', 'check_location_recovery.py', 'check_location_upload.py',
+          'check_group_sharing.py')
 
 
 def revision(path):
@@ -90,8 +91,9 @@ def main():
                                       for c in item.findall('counter'))}
             required = {'com/closecircle/api/location/' + item for item in (
                 'LatestLocationController', 'LatestLocationService', 'LocationUploadController', 'LocationUploadService')}
+            required |= {'com/closecircle/api/sharing/SharingController', 'com/closecircle/api/sharing/SharingService'}
             if not required.issubset(covered_classes):
-                raise RuntimeError('HTTP execution did not cover the location read/upload paths')
+                raise RuntimeError('HTTP execution did not cover the location read/upload or sharing paths')
 
     cli = tools / f'org.jacoco.cli-{JACOCO}-nodeps.jar'
     agent = tools / f'org.jacoco.agent-{JACOCO}-runtime.jar'

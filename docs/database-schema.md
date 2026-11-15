@@ -157,6 +157,8 @@ There can be at most one settings row per `(group_id, user_id)` pair. The `share
 
 Creating a membership does not automatically create a `shares` row. The `TRUE` defaults apply only when a row is inserted and the corresponding values are omitted; they do not establish consent. The meaning of a missing row and the initial sharing and consent policy must be agreed by the team before exposing locations. Until then, do not assume that an absent row grants visibility. The application must also set `updated_at` explicitly when updating sharing settings; V1 has no update trigger.
 
+SCRUM-15 implementation: `SharingService` is the only writer. It upserts the row on `ON CONFLICT (group_id, user_id)`, always sends both flags explicitly (the column defaults are never relied on), and sets `updated_at = now()` only when a flag changes. A missing row is treated as not sharing by the sharing, read and upload code. No migration was needed.
+
 ### `locations`
 
 | Column | Type | Rules / purpose |
