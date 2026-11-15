@@ -2,7 +2,7 @@
 
 The latest-location endpoint already stores its source of truth in PostgreSQL. A lack of new recordings does not delete or replace the last saved point, alter its timestamps, or make it recent. SCRUM-20's configured freshness metadata lets clients distinguish that last-known point from a recent recording. SCRUM-21 adds repeatable recovery coverage for this backend behaviour; no new schema or connection-presence flag is needed.
 
-This branch depends on the unmerged SCRUM-19, SCRUM-20 and SCRUM-22 changes. Review its changes against `feature/SCRUM-22-location-accuracy` and merge only after those dependencies. It does not merge or deploy anything into `dev` or `main`.
+PR #4 was approved by Bogdanctx and merged into `dev` after SCRUM-19/20/22 on 15 November 2026. SCRUM-43's upload implementation was then reviewed and merged. Merge status does not establish deployed availability or Android acceptance.
 
 ## Verified behaviour
 
@@ -18,8 +18,8 @@ CI runs these checks alongside authorization, freshness and accuracy regressions
 
 ## Remaining end-to-end work
 
-These are backend **read-path** checks. Tests seed accepted recordings through SQL because `POST /groups/{groupId}/locations` is still a proposed route. They do not establish that upload ingestion or the Android offline queue works.
+The dedicated recovery suite seeds accepted points through SQL. The merged SCRUM-43 upload suite separately exercises real HTTP uploads, restart/concurrent retries and the upload/read/freshness flow. Neither establishes that the Android offline queue works.
 
-The upload owner must implement and verify ingestion against current identity, membership and consent, including retry/order/idempotency policy. Android must retain an allowed last-known view during network failure, show that updates are stale, retry or resume on reconnection, and handle visibility revocation when it reconnects. Offline storage lifetime and removal rules need team agreement; the server cannot erase data from a disconnected client. Do not equate `LAST_KNOWN` with proven device disconnection.
+Backend ingestion and retry/order checks are implemented and verified under SCRUM-43 against current identity, membership and consent. Android must retain an allowed last-known view during network failure, show that updates are stale, retry or resume on reconnection, and handle visibility revocation when it reconnects. Offline storage lifetime and removal rules need team agreement; the server cannot erase data from a disconnected client. Do not equate `LAST_KNOWN` with proven device disconnection.
 
 SCRUM-21 remains In Progress until those integration and client acceptance criteria are demonstrated. SCRUM-42 remains open until the team reviews the shared contract.

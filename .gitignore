@@ -32,10 +32,5 @@ skills-lock.json
 
 node_modules/
 
-# Python contract validation environments and caches
+# Local contract validation environment
 .venv-contract/
-__pycache__/
-*.py[cod]
-
-# Isolated CI backend checkout
-.backend-under-test/

@@ -10,12 +10,6 @@ on:
 permissions:
   contents: read
 
-# Temporary integration snapshot: PR #5 includes the unmerged PR #1-4 endpoints.
-# Update this reviewed SHA when backend changes are ready to test together.
-# This is a contract/backend pair check, not proof that dev contains the routes.
-env:
-  LOCATION_BACKEND_COMMIT: a505df189ebe7dec15eb75c92194072df7de3d30
-
 jobs:
   contract:
     name: Validate OpenAPI and client payload examples
@@ -43,19 +37,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Check out pinned backend implementation
-        uses: actions/checkout@v4
-        with:
-          repository: MihneaCucu/CloseCircle
-          ref: ${{ env.LOCATION_BACKEND_COMMIT }}
-          path: .backend-under-test
-          persist-credentials: false
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
-          cache-dependency-path: .backend-under-test/backend/pom.xml
+          cache-dependency-path: backend/pom.xml
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -67,10 +54,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql postgresql-client
           echo "$(pg_config --bindir)" >> "$GITHUB_PATH"
-      - name: Build the pinned backend
-        run: mvn -B -ntp -f .backend-under-test/backend/pom.xml clean verify
+      - name: Build the backend from the same checkout
+        run: mvn -B -ntp -f backend/pom.xml clean verify
       - name: Verify actual upload, read, metadata and error responses
-        run: python backend/src/test/python/check_location_contract_http.py --backend-root .backend-under-test/backend
+        run: python backend/src/test/python/check_location_contract_http.py --backend-root backend
 
   coverage:
     name: Measure unit and PostgreSQL coverage
@@ -81,19 +68,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Check out the same pinned backend
-        uses: actions/checkout@v4
-        with:
-          repository: MihneaCucu/CloseCircle
-          ref: ${{ env.LOCATION_BACKEND_COMMIT }}
-          path: .backend-under-test
-          persist-credentials: false
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
-          cache-dependency-path: .backend-under-test/backend/pom.xml
+          cache-dependency-path: backend/pom.xml
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -106,7 +86,7 @@ jobs:
           sudo apt-get install -y postgresql postgresql-client
           echo "$(pg_config --bindir)" >> "$GITHUB_PATH"
       - name: Run unit, PostgreSQL and HTTP contract suites with coverage
-        run: python backend/src/test/python/run_backend_coverage.py --backend-root .backend-under-test/backend
+        run: python backend/src/test/python/run_backend_coverage.py --backend-root backend
       - name: Publish coverage summary
         if: always()
         run: |

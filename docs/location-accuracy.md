@@ -1,6 +1,6 @@
 # Location accuracy: SCRUM-22 backend implementation
 
-SCRUM-22 asks for a visual warning when a location has poor accuracy and a configurable, documented threshold. This branch integrates the assessment into the latest-location response, building on the unmerged SCRUM-19 and SCRUM-20 backend changes. Review this PR against `feature/SCRUM-20-location-freshness`, then retarget to `dev` after that dependency is merged. Android's visual marker and team agreement on the numeric threshold remain outstanding; the shared story is not Done.
+SCRUM-22 asks for a visual warning when a location has poor accuracy and a configurable, documented threshold. Its assessment is integrated into the latest-location response. PR #2 was approved by Bogdanctx and merged into `dev` after SCRUM-19/20 on 15 November 2026. Android's visual marker and team agreement on the numeric threshold remain outstanding; the shared story is not Done.
 
 ## Assessment
 
@@ -12,7 +12,7 @@ SCRUM-22 asks for a visual warning when a location has poor accuracy and a confi
 | Finite uncertainty above the configured threshold | `POOR` |
 | Missing, negative, NaN, or infinite uncertainty | `UNKNOWN` |
 
-The threshold boundary is inclusive. These statuses describe the reported measurement, not a guarantee of the member's actual position. An unknown value must not be treated as good accuracy. Upload validation must reject invalid measurements when that route is implemented. This read-side assessment does not make them valid; non-finite or negative stored uncertainty is returned as `accuracyM: null`.
+The threshold boundary is inclusive. These statuses describe the reported measurement, not a guarantee of the member's actual position. An unknown value must not be treated as good accuracy. Upload validation rejects invalid measurements through SCRUM-43. This read-side assessment does not make them valid; non-finite or negative stored uncertainty is returned as `accuracyM: null`.
 
 ## Configuration
 
@@ -24,7 +24,7 @@ When configured, each permitted member includes `"accuracy": {"status":"POOR","p
 
 ## Remaining review and client work
 
-1. Review and merge SCRUM-19 and SCRUM-20 in dependency order before this PR.
+1. Review is complete and the backend dependencies are merged; validate the integrated client flow.
 2. Agree on the numeric threshold, response field names, and unknown-value display with the Android/backend owners. The classification and boundary above are the implementation proposal for that review.
 3. Android implements the visual warning and verifies it against this proposed response. Assessment never grants access to coordinates or decides retention.
 
