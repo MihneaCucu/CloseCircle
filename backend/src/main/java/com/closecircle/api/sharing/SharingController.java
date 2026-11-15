@@ -23,7 +23,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
-@RequestMapping("/api/v1/groups/{groupId}/me/sharing")
+@RequestMapping("/api/v1")
 public class SharingController {
     private final SharingService sharing;
 
@@ -31,12 +31,12 @@ public class SharingController {
         this.sharing = sharing;
     }
 
-    @GetMapping
+    @GetMapping("/groups/{groupId}/me/sharing")
     public ResponseEntity<SharingSettings> get(@PathVariable UUID groupId, @AuthenticationPrincipal Jwt jwt) {
         return ok(sharing.get(groupId, userId(jwt)));
     }
 
-    @PutMapping(consumes = "application/json")
+    @PutMapping(path = "/groups/{groupId}/me/sharing", consumes = "application/json")
     public ResponseEntity<SharingSettings> update(@PathVariable UUID groupId, @AuthenticationPrincipal Jwt jwt,
             @RequestBody JsonNode body) {
         UUID userId = userId(jwt);
@@ -45,9 +45,14 @@ public class SharingController {
         return ok(updated);
     }
 
-    @DeleteMapping
+    @DeleteMapping("/groups/{groupId}/me/sharing")
     public ResponseEntity<SharingSettings> revoke(@PathVariable UUID groupId, @AuthenticationPrincipal Jwt jwt) {
         return ok(sharing.revoke(groupId, userId(jwt)));
+    }
+
+    @GetMapping("/users/me/sharing")
+    public ResponseEntity<SharedGroups> sharedGroups(@AuthenticationPrincipal Jwt jwt) {
+        return ok(new SharedGroups(sharing.activeGroups(userId(jwt))));
     }
 
     static UUID userId(Jwt jwt) {
@@ -62,8 +67,8 @@ public class SharingController {
         }
     }
 
-    private static ResponseEntity<SharingSettings> ok(SharingSettings settings) {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(settings);
+    private static <T> ResponseEntity<T> ok(T body) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(body);
     }
 
     @ExceptionHandler(ResponseStatusException.class)
