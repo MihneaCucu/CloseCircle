@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import socket
 import subprocess
+import sys
 import tempfile
 import time
 import urllib.error
@@ -204,6 +205,13 @@ def main(verify=None, app_args=(), verify_recovery=None, verify_upload=None):
                 sql(f"DELETE FROM group_members WHERE group_id='{group}' AND user_id='{ids[0]}';")
                 assert request(ids[0])[0] == 404
                 print('PASS: invalid JWTs, membership, group isolation, live sharing, latest point, pagination and revocation')
+        except BaseException:
+            # The temporary directory is deleted on exit; keep the server-side error visible in CI.
+            log_file = Path(temp) / 'app.log'
+            if log_file.exists():
+                print('--- last backend log lines ---\n' + '\n'.join(log_file.read_text().splitlines()[-60:]),
+                      file=sys.stderr)
+            raise
         finally:
             stop_app()
             if server_started:
