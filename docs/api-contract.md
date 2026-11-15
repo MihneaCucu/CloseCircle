@@ -1,6 +1,8 @@
 # CloseCircle REST API contract
 
-**Status:** Draft v0.1 — proposed for review under SCRUM-42. Android, React, simulator, and backend owners must review the open decisions before client implementation. The `dev` baseline provides `GET /actuator/health` and `GET /actuator/info`; the SCRUM-19 development branch adds a latest-location read endpoint, described below. Other business routes are proposals.
+**Status:** Draft v0.1 — proposed for review under SCRUM-42. Android, React, simulator, and backend owners must review the open decisions before client implementation. The `dev` baseline includes infrastructure health/info, latest-member-location reads and own-location uploads, with optional freshness/accuracy metadata. PRs #1-5 were reviewed and merged on 15 November 2026. Other business routes remain proposals until their owners integrate them.
+
+For the merged SCRUM-19/20/21/22/43 location backend, use the [machine-readable integration contract](contracts/README.md). It records tested read/upload behavior, including configurable metadata, offset timestamp normalization, conservative consent checks and idempotent retries. It is a review draft; these routes are implemented in this checkout, while deployed availability and client acceptance must be checked separately. Its feature details take precedence over older location proposals below for integration testing, without implying team approval.
 
 This document defines the client-facing JSON contract. It is independent of PostgreSQL table names and columns. Persisted schema changes are versioned separately with Flyway under `backend/src/main/resources/db/migration/`.
 
@@ -22,7 +24,7 @@ This document defines the client-facing JSON contract. It is independent of Post
 | Nullability | A missing optional field means “not supplied”; explicit `null` is allowed only where a schema says so |
 | CORS | Browser access is limited to the explicitly configured dashboard origin; CORS is not authentication |
 
-The SCRUM-19 development branch implements the latest-location read route described below. The remaining business routes are proposals for coordinated implementation; do not infer that a route is live from its appearance here. This contract remains a draft pending team review.
+The merged backend implements the latest-location read and upload routes described below. The remaining business routes are proposals for coordinated implementation; do not infer that a route is live from its appearance here. This contract remains a draft pending team review.
 
 ## 2. Authentication and access model
 
@@ -300,7 +302,7 @@ For v1, `sharingEnabled=false` suppresses all location visibility for the caller
 
 `accuracyM` may be omitted or `null`; if present it must be finite and non-negative. `recordedAt` is required and may not be more than five minutes in the future (proposed clock-skew allowance). The server derives the user from JWT and checks membership and sharing permissions before persisting. `GET /groups/{groupId}/locations/latest` returns a page of `{userId, displayName, location}` entries, excluding the caller and any member whose sharing settings or permissions prohibit visibility. Each `location` is a `Location` object or `null` when an otherwise visible member has not uploaded a point; do not include a member whose sharing is disabled. `GET /groups/{groupId}/members/{userId}/locations` returns a page of location objects filtered by required `from` and `to` timestamps; maximum requested history range is a policy decision that must be agreed before implementation.
 
-**SCRUM-19 development branch:** the latest-location route requires current group membership and returns `404` for a nonexistent or inaccessible group. It includes other members only when both `sharing_enabled` and `share_live_location` are true; a missing settings row is not visible. The latest point is selected by descending `(recorded_at, location_id)`, and a visible member without a point has `location: null`. Pages use opaque cursors ordered by membership `(joined_at, user_id)` descending. The endpoint returns `Cache-Control: no-store`. This is a read endpoint; the Android view, refresh mechanism, location upload, and team-approved privacy/retention decisions remain outstanding.
+**Merged SCRUM-19 backend:** the latest-location route requires current group membership and returns `404` for a nonexistent or inaccessible group. It includes other members only when both `sharing_enabled` and `share_live_location` are true; a missing settings row is not visible. The latest point is selected by descending `(recorded_at, location_id)`, and a visible member without a point has `location: null`. Pages use opaque cursors ordered by membership `(joined_at, user_id)` descending. The endpoint returns `Cache-Control: no-store`. This read endpoint is paired with the merged SCRUM-43 upload handler. Android view/refresh, integration with auth/group/sharing changes, and team-approved privacy/retention decisions remain outstanding.
 
 `LatestLocation` example:
 
@@ -397,31 +399,31 @@ Precise coordinates, location payloads, authorization headers, and invitation to
 
 Allowed scenarios and controls are provisional. A simulator must use synthetic accounts and locations, have a short maximum duration, and be disabled in production. `GET` returns the same scenario object; `POST .../{scenarioId}/stop` returns `204`. The simulator must never accept a client-supplied identity as authority to write a real member's location.
 
-### Freshness metadata (SCRUM-20 development branch)
+### Freshness metadata (SCRUM-20 merged backend)
 
-The SCRUM-20 branch builds on the unmerged SCRUM-19 endpoint and adds optional `freshness` to each permitted `LatestLocation` member. Set `closecircle.location.recent-for-seconds` to enable it; there is no product default, and without configuration the field is omitted. Its object is `{status, evaluatedAt, recentForSeconds}`: `status` is `RECENT`, `LAST_KNOWN`, or `UNKNOWN`; `evaluatedAt` is one server UTC timestamp shared by the response; `recentForSeconds` is the configured non-negative integer window. The existing `location.recordedAt` remains the displayed update time.
+The merged SCRUM-20 implementation builds on SCRUM-19's endpoint and adds optional `freshness` to each permitted `LatestLocation` member. Set `closecircle.location.recent-for-seconds` to enable it; there is no product default, and without configuration the field is omitted. Its object is `{status, evaluatedAt, recentForSeconds}`: `status` is `RECENT`, `LAST_KNOWN`, or `UNKNOWN`; `evaluatedAt` is one server UTC timestamp shared by the response; `recentForSeconds` is the configured non-negative integer window. The existing `location.recordedAt` remains the displayed update time.
 
-An age at or below the window is recent. Older points are last-known, and missing/future points are unknown. Classification uses recording time, not receipt time, and never changes visibility. This is implemented for review on the feature branch, not deployed or team-approved. See [location-freshness.md](location-freshness.md) for configuration, tests and remaining decisions.
+An age at or below the window is recent. Older points are last-known, and missing/future points are unknown. Classification uses recording time, not receipt time, and never changes visibility. The backend code is reviewed and merged into dev; deployment, client acceptance and agreement on product settings remain separate. See [location-freshness.md](location-freshness.md) for configuration, tests and remaining decisions.
 
-### Accuracy metadata (SCRUM-22 development branch)
+### Accuracy metadata (SCRUM-22 merged backend)
 
-Building on SCRUM-20, the SCRUM-22 branch adds optional `accuracy` to each permitted `LatestLocation` member. Set `closecircle.location.poor-accuracy-threshold-m` to a finite positive number of metres to enable it. With no configured threshold the field is omitted. The object is `{status, poorAccuracyThresholdM}`: `status` is `ACCEPTABLE` for finite non-negative uncertainty at or below the threshold, `POOR` above it, or `UNKNOWN` for missing/invalid uncertainty. A member with `location: null` gets `UNKNOWN`. Non-finite or negative stored uncertainty is exposed as `accuracyM: null`.
+Building on SCRUM-20, the merged SCRUM-22 implementation adds optional `accuracy` to each permitted `LatestLocation` member. Set `closecircle.location.poor-accuracy-threshold-m` to a finite positive number of metres to enable it. With no configured threshold the field is omitted. The object is `{status, poorAccuracyThresholdM}`: `status` is `ACCEPTABLE` for finite non-negative uncertainty at or below the threshold, `POOR` above it, or `UNKNOWN` for missing/invalid uncertainty. A member with `location: null` gets `UNKNOWN`. Non-finite or negative stored uncertainty is exposed as `accuracyM: null`.
 
-Accuracy and freshness are independent and never grant visibility. This is implemented for review on the feature branch, not deployed or team-approved. The product threshold and Android marker remain for review and client implementation; see [location-accuracy.md](location-accuracy.md).
+Accuracy and freshness are independent and never grant visibility. The backend code is reviewed and merged into dev; deployment, client acceptance and agreement on product settings remain separate. The product threshold and Android marker remain for review and client implementation; see [location-accuracy.md](location-accuracy.md).
 
 ### Last-known recovery (SCRUM-21 backend read path)
 
-The read endpoint preserves the saved point and its original timestamps when no new recording arrives, including across API/database restart. A delayed older recording does not replace a more recent recorded point; a new accepted recording is visible on the next read, subject to current membership/sharing checks. SCRUM-21 verifies these behaviours against PostgreSQL. This does not implement or verify upload ingestion, mobile offline caching/retries, or a device connectivity signal. See [location-recovery.md](location-recovery.md) for coverage and the remaining end-to-end work.
+The read endpoint preserves the saved point and its original timestamps when no new recording arrives, including across API/database restart. A delayed older recording does not replace a more recent recorded point; a new accepted recording is visible on the next read, subject to current membership/sharing checks. SCRUM-21 verifies these behaviours against PostgreSQL. SCRUM-43 additionally implements and verifies upload ingestion and safe retries; mobile offline caching/reconnection and a device connectivity signal remain separate. See [location-recovery.md](location-recovery.md) for coverage and the remaining end-to-end work.
 
-### Location upload (SCRUM-43 development branch)
+### Location upload (SCRUM-43 merged backend)
 
-The SCRUM-43 branch implements `POST /groups/{groupId}/locations` on top of the unmerged location-read dependencies. It accepts exactly the documented latitude, longitude, nullable/optional `accuracyM` and required offset timestamp `recordedAt`; unknown fields and non-finite/out-of-range measurements return `400 INVALID_LOCATION`. Timestamps are normalized to microsecond UTC precision. Identity and receipt time are server-derived.
+The merged SCRUM-43 backend implements `POST /groups/{groupId}/locations` on top of the merged location-read implementation. It accepts exactly the documented latitude, longitude, nullable/optional `accuracyM` and required offset timestamp `recordedAt`; unknown fields and non-finite/out-of-range measurements return `400 INVALID_LOCATION`. Timestamps are normalized to microsecond UTC precision. Identity and receipt time are server-derived.
 
 Current membership is required (`404 GROUP_NOT_FOUND` otherwise). Missing sharing preferences or either disabled sharing flag returns `403 LOCATION_SHARING_DISABLED`. A recording before the current preference update returns `403 LOCATION_CONSENT_CHANGED`. This conservative consent-boundary rule is implemented for team review; it does not approve retention or upload while sharing is off. Future clock tolerance is configured with `closecircle.location.upload-max-future-seconds` (integer 0-300, default 0); the earlier five-minute proposal is not an implicit default.
 
 An optional UUID `Idempotency-Key` header makes retries safe within the authenticated user/group. A new write returns `201 Location`; an identical retry returns `200` with the saved representation; different payload for the same key returns `409 IDEMPOTENCY_CONFLICT`. Authorization is rechecked on retries. Without a key, repeated POSTs create separate recordings. New upload responses use `Cache-Control: no-store`; older recorded points never replace newer ones in the latest-location read.
 
-This is implemented and tested on the feature branch, not deployed or accepted as a whole story. See [location-upload.md](location-upload.md) for error, configuration, migration and test details, and [checkpoint-2-readiness.md](checkpoint-2-readiness.md) for the story-count boundary.
+This backend is reviewed, merged and tested; deployment and whole-story acceptance remain separate. See [location-upload.md](location-upload.md) for error, configuration, migration and test details, and [checkpoint-2-readiness.md](checkpoint-2-readiness.md) for the story-count boundary.
 
 The latest-location read endpoint rejects non-canonical JWT UUID subjects with `401 INVALID_TOKEN` and a Bearer challenge. Invalid path/query types return `400 INVALID_PARAMETER`; malformed, unrepresentable or sub-microsecond cursors return `400 INVALID_CURSOR`. These local errors use Problem Details and `Cache-Control: no-store` without echoing input values.
 

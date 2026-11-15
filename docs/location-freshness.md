@@ -1,6 +1,6 @@
 # Location freshness: SCRUM-20 backend implementation
 
-SCRUM-20 asks the client to distinguish a recent location from a last-known one and show when it was recorded. This branch integrates the classifier into SCRUM-19's authenticated latest-location response. It includes PR #1 as an unmerged dependency; review the SCRUM-20 changes against `feature/SCRUM-19-member-locations`, then retarget to `dev` after that dependency is merged. Neither this branch nor PR #1 is deployed by this work.
+SCRUM-20 asks the client to distinguish a recent location from a last-known one and show when it was recorded. The classifier is integrated into SCRUM-19's authenticated response. PR #3 was approved by prezcu and merged into `dev` after PR #1 on 15 November 2026. Android presentation and team agreement on the window remain separate; merge status alone does not establish deployment or whole-story acceptance.
 
 `LocationFreshness.assess(recordedAt, recentFor, clock)` returns the original `recordedAt` and one of these proposed statuses:
 
@@ -32,6 +32,6 @@ Membership and sharing are checked before any classification. Hidden members rem
 
 ## Review and verification
 
-The Android, backend, and product owners still need to agree on the numeric window, future-clock handling, proposed response fields, and unknown-value display. The implementation is ready for backend review and combined testing, not a statement of team approval or completion of Android work.
+The Android, backend, and product owners still need to agree on the numeric window, future-clock handling, proposed response fields, and unknown-value display. The backend implementation has passed review and is merged; this does not establish agreement on every product setting or completion of Android work.
 
 Run `mvn -f backend/pom.xml verify`, then from `backend/` run `python3 src/test/python/check_location_freshness.py`. The HTTP regression starts disposable local PostgreSQL and the real API with classification disabled and enabled. It checks old/recent/future/missing points, recording versus receipt time, the configured window and shared evaluation time, automatic RECENT-to-LAST_KNOWN aging across repeated reads without changing the point or timestamp, plus existing authorization, isolation and revocation checks. CI runs it on every PR. No production database is accessed.

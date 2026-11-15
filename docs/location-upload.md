@@ -1,6 +1,6 @@
 # Location upload backend
 
-SCRUM-43 is a backend subtask of SCRUM-21 supporting the member-location flow in SCRUM-19/20. Its branch, `feature/SCRUM-43-location-upload`, includes the unmerged read/freshness/accuracy/recovery dependencies. Review against `feature/SCRUM-21-location-recovery` and merge only after those dependencies. Android and teammate authentication/group/sharing work remain separate.
+SCRUM-43 is a backend subtask of SCRUM-21 supporting the member-location flow in SCRUM-19/20. PR #5 was approved by Bogdanctx and merged into `dev` after the read/freshness/accuracy/recovery dependencies on 15 November 2026. Android and teammate authentication/group/sharing integration remain separate.
 
 ## Request and response
 

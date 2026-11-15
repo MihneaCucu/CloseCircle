@@ -31,3 +31,6 @@ __pycache__/
 skills-lock.json
 
 node_modules/
+
+# Local contract validation environment
+.venv-contract/
