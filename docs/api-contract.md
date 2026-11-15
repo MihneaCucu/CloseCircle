@@ -1,6 +1,6 @@
 # CloseCircle REST API contract
 
-**Status:** Draft v0.1 — proposed for review under SCRUM-42. Android, React, simulator, and backend owners must review the open decisions before client implementation. The `dev` baseline includes infrastructure health/info, latest-member-location reads and own-location uploads, with optional freshness/accuracy metadata. PRs #1-5 were reviewed and merged on 15 November 2026. The SCRUM-15 per-group sharing settings routes (`GET`/`PUT`/`DELETE /api/v1/groups/{groupId}/me/sharing` and `GET /api/v1/users/me/sharing`, SCRUM-15/16/17/18) are implemented on their feature branch. SCRUM-41 adds account registration and login (`POST /api/v1/auth/register`, `POST /api/v1/auth/login`) and `GET /api/v1/users/me`; SCRUM-11 adds group creation and listing (`POST /api/v1/groups`, `GET /api/v1/groups`). Other business routes remain proposals until their owners integrate them.
+**Status:** Draft v0.1 — proposed for review under SCRUM-42. Android, React, simulator, and backend owners must review the open decisions before client implementation. The `dev` baseline includes infrastructure health/info, latest-member-location reads and own-location uploads, with optional freshness/accuracy metadata. PRs #1-5 were reviewed and merged on 15 November 2026. The SCRUM-15 per-group sharing settings routes (`GET`/`PUT`/`DELETE /api/v1/groups/{groupId}/me/sharing` and `GET /api/v1/users/me/sharing`, SCRUM-15/16/17/18) are implemented on their feature branch. SCRUM-41 adds account registration and login (`POST /api/v1/auth/register`, `POST /api/v1/auth/login`) and `GET /api/v1/users/me`; SCRUM-11 adds group creation and listing (`POST /api/v1/groups`, `GET /api/v1/groups`). SCRUM-12 adds invitations (`POST`/`GET /api/v1/groups/{groupId}/invitations` and `GET /api/v1/invitations`). Other business routes remain proposals until their owners integrate them.
 
 For the merged SCRUM-19/20/21/22/43 location backend, use the [machine-readable integration contract](contracts/README.md). It records tested read/upload behavior, including configurable metadata, offset timestamp normalization, conservative consent checks and idempotent retries. It is a review draft; these routes are implemented in this checkout, while deployed availability and client acceptance must be checked separately. Its feature details take precedence over older location proposals below for integration testing, without implying team approval.
 
@@ -95,6 +95,7 @@ All other current backend routes require a valid Bearer JWT. The business routes
 | `POST /groups/{groupId}/invitations` | Owner or Admin | User, Admin | UUID `groupId`; `CreateInvitationRequest` | `201 Invitation` |
 | `GET /groups/{groupId}/invitations` | Owner or Admin | User, Admin | UUID `groupId`; optional `status`, `limit`, `cursor` | `200 Page<Invitation>` |
 | `DELETE /groups/{groupId}/invitations/{invitationId}` | Owner or Admin | User, Admin | UUIDs | `204` |
+| `GET /invitations` | User JWT | User | `limit`, `cursor` | `200 Page<ReceivedInvitation>` |
 | `POST /invitations/accept` | User JWT | User | `AcceptInvitationRequest` | `200 Membership` |
 | `PUT /groups/{groupId}/me/sharing` | Group member | User | UUID `groupId`; `UpdateSharingRequest` | `200 SharingPreferences` |
 | `DELETE /groups/{groupId}/me/sharing` | Group member | User | UUID `groupId` | `200 SharingPreferences` |
@@ -260,6 +261,14 @@ The raw invitation token must be delivered out-of-band through the team-approved
 ```
 
 Expired, revoked, already-used, or email-mismatched tokens return `400` with a stable error `code`; the precise public message must not disclose whether an email address has an account.
+
+**Implemented in SCRUM-12 (in-app delivery):**
+
+- `POST /groups/{groupId}/invitations` is allowed for `OWNER` and `ADMIN` (`403 INSUFFICIENT_ROLE` for `MEMBER`; `404 GROUP_NOT_FOUND` for non-members and unknown groups alike). The email is trimmed and validated; it does not need an account yet, and the response is the same either way. Invitations last 7 days and start as `PENDING`. The raw token is generated and only its SHA-256 hash is stored; it is never returned while the delivery channel is undecided.
+- Conflicts return `409`: `ALREADY_MEMBER` when a member of the group already uses that email, `INVITATION_ALREADY_PENDING` when that email already has a pending invitation to the group (case-insensitive, also enforced by a database index).
+- `GET /groups/{groupId}/invitations` (`OWNER`/`ADMIN`) returns `Page<Invitation>` newest first. A `PENDING` invitation past `expiresAt` is reported as `EXPIRED`.
+- `GET /invitations` is how the invitee receives invitations: it returns pending, unexpired invitations addressed to the caller's account email (case-insensitive) for groups they are not already in, newest first. `ReceivedInvitation` is `{invitationId, groupId, groupName, invitedBy: {userId, displayName}, status, createdAt, expiresAt}`; the inviter's email is not exposed.
+- Accepting or declining (SCRUM-13) is not part of SCRUM-12.
 
 ### Sharing and locations
 
@@ -547,7 +556,7 @@ Sensitive-data rules apply end to end: do not log request bodies, Authorization 
 | Email verification and invite delivery | One-time hashed invitation token; delivery channel/provider not selected | Product, backend | Invitations |
 | Owner transfer and group deletion | Owner-only deletion; owner must transfer before leaving; deletion retention behavior TBD | Product, backend | Group administration |
 | Role capabilities | Matrix in section 2; owner-only role changes and atomic transfer proposed | Product, Android, backend | Authorization and admin UI |
-| Invitation delivery | Out-of-band channel needed; whether the API returns a token once for client-generated links is unresolved | Product, backend, Android | Invitation acceptance |
+| Invitation delivery | SCRUM-12 delivers in-app: the invitee sees invitations for their account email via `GET /invitations`. An email/link channel, and whether the API returns a token for it, remain unresolved | Product, backend, Android | Invitation acceptance |
 | Sharing privacy and retention | Self-service controls; uploads while sharing is off and historical retention are unresolved | Product, privacy, Android | Location read/write |
 | Location limits and offline sync | Five-minute future clock skew; history time window, max upload frequency, batch/idempotency semantics TBD | Android, backend | Location upload/history |
 | Location updates and visibility (SCRUM-19) | The latest-location REST response is proposed; choose how clients refresh it and how quickly visibility changes take effect. Only currently authorized, sharing members may appear. | Android, backend, product | Member location view and updates |

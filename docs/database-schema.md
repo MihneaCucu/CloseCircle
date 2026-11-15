@@ -141,6 +141,7 @@ The primary key is `(group_id, user_id)`, allowing a user to belong to multiple 
 | `accepted_at` | `TIMESTAMPTZ` | Nullable; must be set exactly when status is `ACCEPTED`. |
 
 There is intentionally no FK from `invitee_email` to `users`: an invite can be created before its recipient has an account.
+`V4__one_pending_invitation_per_email.sql` (SCRUM-12) adds a partial unique index `invitations_one_pending_per_email` on `(group_id, lower(invitee_email)) WHERE status = 'PENDING'`: at most one pending invitation per email and group. Nothing updates a row when it expires, so the API marks a person's expired `PENDING` rows as `EXPIRED` before inviting them again.
 The FK on `invited_by` only checks that the sender exists; check group membership and role in the service layer.
 
 ### `shares`
@@ -216,5 +217,5 @@ A partial index supports listing a recipient's unread notifications by newest fi
 - Flyway applies versioned SQL from `backend/src/main/resources/db/migration/`.
 - Add a new migration such as `V2__...sql` for schema changes; do not edit an already-applied migration in a shared database.
 - Hibernate uses `ddl-auto: validate`, so it checks mappings against the migrated database and does not create or modify tables.
-- JPA entities exist for `users` (`api.user.User`), `groups` (`api.group.Group`, entity name `CircleGroup` because `GROUP` is a JPQL keyword) and `group_members` (`api.group.GroupMember`, composite key). Use this document and V1 as the mapping guide for the remaining tables. Set timestamp and role columns explicitly in Java: Hibernate inserts `NULL` for unset fields instead of applying the column default.
+- JPA entities exist for `users` (`api.user.User`), `groups` (`api.group.Group`, entity name `CircleGroup` because `GROUP` is a JPQL keyword) and `group_members` (`api.group.GroupMember`, composite key) and `invitations` (`api.invitation.Invitation`). Use this document and V1 as the mapping guide for the remaining tables. Set timestamp and role columns explicitly in Java: Hibernate inserts `NULL` for unset fields instead of applying the column default.
 - Keep API JSON contracts separate from table structure. See [`api-contract.md`](api-contract.md); its business endpoints are a draft and are not implied by the existence of these tables.
