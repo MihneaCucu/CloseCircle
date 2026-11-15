@@ -47,6 +47,10 @@ jobs:
         working-directory: backend
         run: python3 src/test/python/check_location_freshness.py
 
+      - name: Verify location accuracy against PostgreSQL
+        working-directory: backend
+        run: python3 src/test/python/check_location_accuracy.py
+
       - name: Build backend Docker image
         run: docker build --tag closecircle-api:ci --file backend/Dockerfile backend
 

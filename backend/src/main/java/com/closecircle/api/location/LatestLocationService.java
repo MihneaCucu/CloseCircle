@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import org.springframework.beans.factory.ObjectProvider;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -23,16 +24,20 @@ public class LatestLocationService {
     private static final Instant END_CURSOR_TIME = Instant.parse("+294277-01-01T00:00:00Z");
     private final JdbcTemplate jdbc;
     private final LocationFreshnessPolicy freshness;
+    private final LocationAccuracy accuracy;
 
-    public LatestLocationService(JdbcTemplate jdbc, LocationFreshnessPolicy freshness) {
+    public LatestLocationService(JdbcTemplate jdbc, LocationFreshnessPolicy freshness,
+            ObjectProvider<LocationAccuracy> accuracy) {
         this.jdbc = jdbc;
         this.freshness = freshness;
+        this.accuracy = accuracy.getIfAvailable();
     }
 
     public record Location(UUID locationId, UUID groupId, UUID userId, double latitude, double longitude,
                            Double accuracyM, Instant recordedAt, Instant receivedAt) { }
     public record MemberLocation(UUID userId, String displayName, Location location,
-            @JsonInclude(JsonInclude.Include.NON_NULL) LocationFreshnessPolicy.Metadata freshness) { }
+            @JsonInclude(JsonInclude.Include.NON_NULL) LocationFreshnessPolicy.Metadata freshness,
+            @JsonInclude(JsonInclude.Include.NON_NULL) LocationAccuracy.Metadata accuracy) { }
     public record Page(List<MemberLocation> items, String nextCursor) { }
     private record Row(MemberLocation item, Instant joinedAt) { }
     private record Cursor(Instant joinedAt, UUID userId) { }
@@ -74,17 +79,22 @@ public class LatestLocationService {
                     UUID locationId = rs.getObject("location_id", UUID.class);
                     Location location = locationId == null ? null : new Location(locationId, groupId, userId,
                             rs.getDouble("latitude"), rs.getDouble("longitude"),
-                            rs.getObject("accuracy_m", Double.class),
+                            finiteAccuracy(rs.getObject("accuracy_m", Double.class)),
                             rs.getObject("recorded_at", OffsetDateTime.class).toInstant(),
                             rs.getObject("received_at", OffsetDateTime.class).toInstant());
                     return new Row(new MemberLocation(userId, rs.getString("display_name"), location,
-                            freshness.assess(location == null ? null : location.recordedAt(), evaluatedAt)),
+                            freshness.assess(location == null ? null : location.recordedAt(), evaluatedAt),
+                            accuracy == null ? null : accuracy.metadata(location == null ? null : location.accuracyM())),
                             rs.getObject("joined_at", OffsetDateTime.class).toInstant());
                 }, groupId, viewerId, viewerId, since, since, afterUser, limit + 1);
         boolean more = rows.size() > limit;
         List<Row> page = more ? rows.subList(0, limit) : rows;
         String next = more ? encode(page.get(page.size() - 1)) : null;
         return new Page(page.stream().map(Row::item).toList(), next);
+    }
+
+    private static Double finiteAccuracy(Double value) {
+        return value == null || !Double.isFinite(value) || value < 0 ? null : value;
     }
 
     private static String encode(Row row) {

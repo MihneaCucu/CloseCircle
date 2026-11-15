@@ -17,6 +17,9 @@ local.properties
 **/dist/
 **/.vite/
 
+# Python regression checks
+__pycache__/
+
 # macOS
 .DS_Store
 .neon
