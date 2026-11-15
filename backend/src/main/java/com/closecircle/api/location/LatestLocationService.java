@@ -69,6 +69,7 @@ public class LatestLocationService {
                 ) l ON true
                 WHERE gm.group_id = ? AND gm.user_id <> ?
                   AND s.sharing_enabled = true AND s.share_live_location = true
+                  AND (s.expires_at IS NULL OR s.expires_at > clock_timestamp())
                   AND EXISTS (SELECT 1 FROM group_members viewer
                               WHERE viewer.group_id = gm.group_id AND viewer.user_id = ?)
                   AND (CAST(? AS timestamptz) IS NULL OR
