@@ -28,7 +28,7 @@ The merged backend implements the latest-location read and upload routes describ
 
 ## 2. Authentication and access model
 
-Registration and login issue HS256 access tokens signed with `JWT_SECRET` (SCRUM-41). Every protected request is checked for a valid signature, issuer `closecircle`, an `exp` that has not passed, and a canonical UUID `sub`; a token missing `exp` or `sub` is rejected. Tokens are valid for 1 hour by default (`JWT_ACCESS_TOKEN_TTL`, e.g. `30m`, `1h`). After expiry, protected routes return `401` and the client must log in again. Authorization claim mapping (group roles) remains open (see [Open decisions](#10-open-decisions-for-scrum-42-review)).
+Registration and login issue HS256 access tokens signed with `JWT_SECRET` (SCRUM-41). Every protected request is checked for a valid signature, issuer `closecircle`, an `exp` that has not passed, and a canonical UUID `sub`; a token missing `exp` or `sub` is rejected. Tokens are valid for 1 hour by default (`JWT_ACCESS_TOKEN_TTL`, e.g. `30m`, `1h`). After expiry, protected routes return `401` and the client must log in again. Every `401` from authentication carries `WWW-Authenticate: Bearer` and a Problem Details body: `code` is `INVALID_TOKEN` when a token was sent but rejected (bad signature, expired, wrong issuer, missing `exp`, non-UUID `sub`), and `AUTHENTICATION_REQUIRED` when no token was sent. The body does not say which check failed. Authorization claim mapping (group roles) remains open (see [Open decisions](#10-open-decisions-for-scrum-42-review)).
 
 Proposed access token claims:
 

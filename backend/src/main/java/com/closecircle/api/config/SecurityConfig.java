@@ -9,6 +9,7 @@ import java.util.UUID;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -43,7 +44,8 @@ public class SecurityConfig {
     static final int MIN_JWT_SECRET_BYTES = 32;
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper json) throws Exception {
+        var entryPoint = new ProblemAuthenticationEntryPoint(json);
         return http
                 .cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable())
@@ -55,7 +57,11 @@ public class SecurityConfig {
                         // would get an empty 401 instead of the real error status.
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated())
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()))
+                // Used both for rejected tokens and for requests that send no token at all.
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .jwt(Customizer.withDefaults())
+                        .authenticationEntryPoint(entryPoint))
+                .exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(entryPoint))
                 .build();
     }
 
