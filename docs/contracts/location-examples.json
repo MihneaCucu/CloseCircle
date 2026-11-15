@@ -1,0 +1,542 @@
+[
+  {
+    "name": "upload without accuracy",
+    "schema": "CreateLocationRequest",
+    "valid": true,
+    "payload": {
+      "latitude": 12.3456,
+      "longitude": -45.6789,
+      "recordedAt": "2026-11-14T12:00:00+02:00"
+    }
+  },
+  {
+    "name": "upload nullable accuracy",
+    "schema": "CreateLocationRequest",
+    "valid": true,
+    "payload": {
+      "latitude": 12.3456,
+      "longitude": -45.6789,
+      "recordedAt": "2026-11-14T12:00:00+02:00",
+      "accuracyM": null
+    }
+  },
+  {
+    "name": "upload zero accuracy",
+    "schema": "CreateLocationRequest",
+    "valid": true,
+    "payload": {
+      "latitude": 12.3456,
+      "longitude": -45.6789,
+      "recordedAt": "2026-11-14T12:00:00+02:00",
+      "accuracyM": 0
+    }
+  },
+  {
+    "name": "coordinate boundaries",
+    "schema": "CreateLocationRequest",
+    "valid": true,
+    "payload": {
+      "latitude": -90,
+      "longitude": 180,
+      "recordedAt": "2026-11-14T12:00:00+02:00"
+    }
+  },
+  {
+    "name": "latitude outside range",
+    "schema": "CreateLocationRequest",
+    "valid": false,
+    "payload": {
+      "latitude": 90.01,
+      "longitude": -45.6789,
+      "recordedAt": "2026-11-14T12:00:00+02:00"
+    }
+  },
+  {
+    "name": "longitude outside range",
+    "schema": "CreateLocationRequest",
+    "valid": false,
+    "payload": {
+      "latitude": 12.3456,
+      "longitude": -180.01,
+      "recordedAt": "2026-11-14T12:00:00+02:00"
+    }
+  },
+  {
+    "name": "negative accuracy",
+    "schema": "CreateLocationRequest",
+    "valid": false,
+    "payload": {
+      "latitude": 12.3456,
+      "longitude": -45.6789,
+      "recordedAt": "2026-11-14T12:00:00+02:00",
+      "accuracyM": -1
+    }
+  },
+  {
+    "name": "numeric string",
+    "schema": "CreateLocationRequest",
+    "valid": false,
+    "payload": {
+      "latitude": "12",
+      "longitude": -45.6789,
+      "recordedAt": "2026-11-14T12:00:00+02:00"
+    }
+  },
+  {
+    "name": "boolean coordinate",
+    "schema": "CreateLocationRequest",
+    "valid": false,
+    "payload": {
+      "latitude": true,
+      "longitude": -45.6789,
+      "recordedAt": "2026-11-14T12:00:00+02:00"
+    }
+  },
+  {
+    "name": "missing timezone",
+    "schema": "CreateLocationRequest",
+    "valid": false,
+    "payload": {
+      "latitude": 12.3456,
+      "longitude": -45.6789,
+      "recordedAt": "2026-11-14T12:00:00"
+    }
+  },
+  {
+    "name": "invalid date",
+    "schema": "CreateLocationRequest",
+    "valid": false,
+    "payload": {
+      "latitude": 12.3456,
+      "longitude": -45.6789,
+      "recordedAt": "2026-02-30T12:00:00Z"
+    }
+  },
+  {
+    "name": "identity override",
+    "schema": "CreateLocationRequest",
+    "valid": false,
+    "payload": {
+      "latitude": 12.3456,
+      "longitude": -45.6789,
+      "recordedAt": "2026-11-14T12:00:00+02:00",
+      "userId": "00000000-0000-0000-0000-000000000002"
+    }
+  },
+  {
+    "name": "unknown request field",
+    "schema": "CreateLocationRequest",
+    "valid": false,
+    "payload": {
+      "latitude": 12.3456,
+      "longitude": -45.6789,
+      "recordedAt": "2026-11-14T12:00:00+02:00",
+      "extra": 1
+    }
+  },
+  {
+    "name": "missing latitude",
+    "schema": "CreateLocationRequest",
+    "valid": false,
+    "payload": {
+      "longitude": -45.6789,
+      "recordedAt": "2026-11-14T12:00:00+02:00"
+    }
+  },
+  {
+    "name": "missing longitude",
+    "schema": "CreateLocationRequest",
+    "valid": false,
+    "payload": {
+      "latitude": 12.3456,
+      "recordedAt": "2026-11-14T12:00:00+02:00"
+    }
+  },
+  {
+    "name": "missing recordedAt",
+    "schema": "CreateLocationRequest",
+    "valid": false,
+    "payload": {
+      "latitude": 12.3456,
+      "longitude": -45.6789
+    }
+  },
+  {
+    "name": "request array",
+    "schema": "CreateLocationRequest",
+    "valid": false,
+    "payload": []
+  },
+  {
+    "name": "saved point",
+    "schema": "Location",
+    "valid": true,
+    "payload": {
+      "locationId": "10000000-0000-0000-0000-000000000001",
+      "groupId": "20000000-0000-0000-0000-000000000001",
+      "userId": "00000000-0000-0000-0000-000000000002",
+      "latitude": 12.3456,
+      "longitude": -45.6789,
+      "accuracyM": null,
+      "recordedAt": "2026-11-14T10:00:00Z",
+      "receivedAt": "2026-11-14T10:00:01Z"
+    }
+  },
+  {
+    "name": "response extension tolerated",
+    "schema": "Location",
+    "valid": true,
+    "payload": {
+      "locationId": "10000000-0000-0000-0000-000000000001",
+      "groupId": "20000000-0000-0000-0000-000000000001",
+      "userId": "00000000-0000-0000-0000-000000000002",
+      "latitude": 12.3456,
+      "longitude": -45.6789,
+      "accuracyM": null,
+      "recordedAt": "2026-11-14T10:00:00Z",
+      "receivedAt": "2026-11-14T10:00:01Z",
+      "futureField": "compatible"
+    }
+  },
+  {
+    "name": "compact UUID rejected",
+    "schema": "Location",
+    "valid": false,
+    "payload": {
+      "locationId": "10000000-0000-0000-0000-000000000001",
+      "groupId": "20000000-0000-0000-0000-000000000001",
+      "userId": "0-0-0-0-2",
+      "latitude": 12.3456,
+      "longitude": -45.6789,
+      "accuracyM": null,
+      "recordedAt": "2026-11-14T10:00:00Z",
+      "receivedAt": "2026-11-14T10:00:01Z"
+    }
+  },
+  {
+    "name": "non-UTC response rejected",
+    "schema": "Location",
+    "valid": false,
+    "payload": {
+      "locationId": "10000000-0000-0000-0000-000000000001",
+      "groupId": "20000000-0000-0000-0000-000000000001",
+      "userId": "00000000-0000-0000-0000-000000000002",
+      "latitude": 12.3456,
+      "longitude": -45.6789,
+      "accuracyM": null,
+      "recordedAt": "2026-11-14T12:00:00+02:00",
+      "receivedAt": "2026-11-14T10:00:01Z"
+    }
+  },
+  {
+    "name": "metadata disabled",
+    "schema": "LatestLocation",
+    "valid": true,
+    "payload": {
+      "userId": "00000000-0000-0000-0000-000000000002",
+      "displayName": "Synthetic member",
+      "location": {
+        "locationId": "10000000-0000-0000-0000-000000000001",
+        "groupId": "20000000-0000-0000-0000-000000000001",
+        "userId": "00000000-0000-0000-0000-000000000002",
+        "latitude": 12.3456,
+        "longitude": -45.6789,
+        "accuracyM": null,
+        "recordedAt": "2026-11-14T10:00:00Z",
+        "receivedAt": "2026-11-14T10:00:01Z"
+      }
+    }
+  },
+  {
+    "name": "missing point",
+    "schema": "LatestLocation",
+    "valid": true,
+    "payload": {
+      "userId": "00000000-0000-0000-0000-000000000002",
+      "displayName": "Synthetic member",
+      "location": null
+    }
+  },
+  {
+    "name": "freshness enabled",
+    "schema": "LatestLocation",
+    "valid": true,
+    "payload": {
+      "userId": "00000000-0000-0000-0000-000000000002",
+      "displayName": "Synthetic member",
+      "location": {
+        "locationId": "10000000-0000-0000-0000-000000000001",
+        "groupId": "20000000-0000-0000-0000-000000000001",
+        "userId": "00000000-0000-0000-0000-000000000002",
+        "latitude": 12.3456,
+        "longitude": -45.6789,
+        "accuracyM": null,
+        "recordedAt": "2026-11-14T10:00:00Z",
+        "receivedAt": "2026-11-14T10:00:01Z"
+      },
+      "freshness": {
+        "status": "RECENT",
+        "evaluatedAt": "2026-11-14T10:00:02Z",
+        "recentForSeconds": 300
+      }
+    }
+  },
+  {
+    "name": "last known point",
+    "schema": "LatestLocation",
+    "valid": true,
+    "payload": {
+      "userId": "00000000-0000-0000-0000-000000000002",
+      "displayName": "Synthetic member",
+      "location": {
+        "locationId": "10000000-0000-0000-0000-000000000001",
+        "groupId": "20000000-0000-0000-0000-000000000001",
+        "userId": "00000000-0000-0000-0000-000000000002",
+        "latitude": 12.3456,
+        "longitude": -45.6789,
+        "accuracyM": null,
+        "recordedAt": "2026-11-14T10:00:00Z",
+        "receivedAt": "2026-11-14T10:00:01Z"
+      },
+      "freshness": {
+        "status": "LAST_KNOWN",
+        "evaluatedAt": "2026-11-14T10:00:02Z",
+        "recentForSeconds": 300
+      }
+    }
+  },
+  {
+    "name": "unknown missing point",
+    "schema": "LatestLocation",
+    "valid": true,
+    "payload": {
+      "userId": "00000000-0000-0000-0000-000000000002",
+      "displayName": "Synthetic member",
+      "location": null,
+      "freshness": {
+        "status": "UNKNOWN",
+        "evaluatedAt": "2026-11-14T10:00:02Z",
+        "recentForSeconds": 300
+      }
+    }
+  },
+  {
+    "name": "accuracy and freshness",
+    "schema": "LatestLocation",
+    "valid": true,
+    "payload": {
+      "userId": "00000000-0000-0000-0000-000000000002",
+      "displayName": "Synthetic member",
+      "location": {
+        "locationId": "10000000-0000-0000-0000-000000000001",
+        "groupId": "20000000-0000-0000-0000-000000000001",
+        "userId": "00000000-0000-0000-0000-000000000002",
+        "latitude": 12.3456,
+        "longitude": -45.6789,
+        "accuracyM": null,
+        "recordedAt": "2026-11-14T10:00:00Z",
+        "receivedAt": "2026-11-14T10:00:01Z"
+      },
+      "freshness": {
+        "status": "RECENT",
+        "evaluatedAt": "2026-11-14T10:00:02Z",
+        "recentForSeconds": 300
+      },
+      "accuracy": {
+        "status": "UNKNOWN",
+        "poorAccuracyThresholdM": 50
+      }
+    }
+  },
+  {
+    "name": "null freshness rejected",
+    "schema": "LatestLocation",
+    "valid": false,
+    "payload": {
+      "userId": "00000000-0000-0000-0000-000000000002",
+      "displayName": "Synthetic member",
+      "location": {
+        "locationId": "10000000-0000-0000-0000-000000000001",
+        "groupId": "20000000-0000-0000-0000-000000000001",
+        "userId": "00000000-0000-0000-0000-000000000002",
+        "latitude": 12.3456,
+        "longitude": -45.6789,
+        "accuracyM": null,
+        "recordedAt": "2026-11-14T10:00:00Z",
+        "receivedAt": "2026-11-14T10:00:01Z"
+      },
+      "freshness": null
+    }
+  },
+  {
+    "name": "unknown freshness enum",
+    "schema": "LatestLocation",
+    "valid": false,
+    "payload": {
+      "userId": "00000000-0000-0000-0000-000000000002",
+      "displayName": "Synthetic member",
+      "location": {
+        "locationId": "10000000-0000-0000-0000-000000000001",
+        "groupId": "20000000-0000-0000-0000-000000000001",
+        "userId": "00000000-0000-0000-0000-000000000002",
+        "latitude": 12.3456,
+        "longitude": -45.6789,
+        "accuracyM": null,
+        "recordedAt": "2026-11-14T10:00:00Z",
+        "receivedAt": "2026-11-14T10:00:01Z"
+      },
+      "freshness": {
+        "status": "ONLINE",
+        "evaluatedAt": "2026-11-14T10:00:02Z",
+        "recentForSeconds": 300
+      }
+    }
+  },
+  {
+    "name": "negative freshness window",
+    "schema": "LatestLocation",
+    "valid": false,
+    "payload": {
+      "userId": "00000000-0000-0000-0000-000000000002",
+      "displayName": "Synthetic member",
+      "location": {
+        "locationId": "10000000-0000-0000-0000-000000000001",
+        "groupId": "20000000-0000-0000-0000-000000000001",
+        "userId": "00000000-0000-0000-0000-000000000002",
+        "latitude": 12.3456,
+        "longitude": -45.6789,
+        "accuracyM": null,
+        "recordedAt": "2026-11-14T10:00:00Z",
+        "receivedAt": "2026-11-14T10:00:01Z"
+      },
+      "freshness": {
+        "status": "RECENT",
+        "evaluatedAt": "2026-11-14T10:00:02Z",
+        "recentForSeconds": -1
+      }
+    }
+  },
+  {
+    "name": "missing location key",
+    "schema": "LatestLocation",
+    "valid": false,
+    "payload": {
+      "userId": "00000000-0000-0000-0000-000000000002",
+      "displayName": "Synthetic member"
+    }
+  },
+  {
+    "name": "nonpositive accuracy threshold",
+    "schema": "LatestLocation",
+    "valid": false,
+    "payload": {
+      "userId": "00000000-0000-0000-0000-000000000002",
+      "displayName": "Synthetic member",
+      "location": {
+        "locationId": "10000000-0000-0000-0000-000000000001",
+        "groupId": "20000000-0000-0000-0000-000000000001",
+        "userId": "00000000-0000-0000-0000-000000000002",
+        "latitude": 12.3456,
+        "longitude": -45.6789,
+        "accuracyM": null,
+        "recordedAt": "2026-11-14T10:00:00Z",
+        "receivedAt": "2026-11-14T10:00:01Z"
+      },
+      "accuracy": {
+        "status": "POOR",
+        "poorAccuracyThresholdM": 0
+      }
+    }
+  },
+  {
+    "name": "empty page",
+    "schema": "LatestLocationPage",
+    "valid": true,
+    "payload": {
+      "items": [],
+      "nextCursor": null
+    }
+  },
+  {
+    "name": "paginated page",
+    "schema": "LatestLocationPage",
+    "valid": true,
+    "payload": {
+      "items": [
+        {
+          "userId": "00000000-0000-0000-0000-000000000002",
+          "displayName": "Synthetic member",
+          "location": {
+            "locationId": "10000000-0000-0000-0000-000000000001",
+            "groupId": "20000000-0000-0000-0000-000000000001",
+            "userId": "00000000-0000-0000-0000-000000000002",
+            "latitude": 12.3456,
+            "longitude": -45.6789,
+            "accuracyM": null,
+            "recordedAt": "2026-11-14T10:00:00Z",
+            "receivedAt": "2026-11-14T10:00:01Z"
+          }
+        }
+      ],
+      "nextCursor": "opaque-server-token"
+    }
+  },
+  {
+    "name": "page missing cursor",
+    "schema": "LatestLocationPage",
+    "valid": false,
+    "payload": {
+      "items": []
+    }
+  },
+  {
+    "name": "page with empty cursor",
+    "schema": "LatestLocationPage",
+    "valid": false,
+    "payload": {
+      "items": [],
+      "nextCursor": ""
+    }
+  },
+  {
+    "name": "controller error",
+    "schema": "Problem",
+    "valid": true,
+    "payload": {
+      "type": "about:blank",
+      "title": "Bad Request",
+      "status": 400,
+      "detail": "Invalid request",
+      "code": "INVALID_LOCATION"
+    }
+  },
+  {
+    "name": "missing error code",
+    "schema": "Problem",
+    "valid": false,
+    "payload": {
+      "type": "about:blank",
+      "title": "Bad Request",
+      "status": 400,
+      "detail": "Invalid request"
+    }
+  },
+  {
+    "name": "not an error status",
+    "schema": "Problem",
+    "valid": false,
+    "payload": {
+      "type": "about:blank",
+      "title": "Bad Request",
+      "status": 200,
+      "detail": "Invalid request",
+      "code": "INVALID_LOCATION"
+    }
+  },
+  {
+    "name": "empty auth body not a problem",
+    "schema": "Problem",
+    "valid": false,
+    "payload": null
+  }
+]

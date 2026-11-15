@@ -151,11 +151,14 @@ The FK on `invited_by` only checks that the sender exists; check group membershi
 | `group_id`, `user_id` | `UUID` | Together reference `(group_id, user_id)` in `group_members`; cascade when membership is removed. |
 | `sharing_enabled` | `BOOLEAN` | Required; defaults to `TRUE`. |
 | `share_live_location` | `BOOLEAN` | Required; defaults to `TRUE`. |
+| `expires_at` | `TIMESTAMPTZ` | Optional (V3, SCRUM-17). `NULL` means no time limit; sharing is active only while it is `NULL` or in the future. |
 | `updated_at` | `TIMESTAMPTZ` | Required; defaults to current time. |
 
 There can be at most one settings row per `(group_id, user_id)` pair. The `share_id` is the primary key; the pair also has a unique constraint.
 
 Creating a membership does not automatically create a `shares` row. The `TRUE` defaults apply only when a row is inserted and the corresponding values are omitted; they do not establish consent. The meaning of a missing row and the initial sharing and consent policy must be agreed by the team before exposing locations. Until then, do not assume that an absent row grants visibility. The application must also set `updated_at` explicitly when updating sharing settings; V1 has no update trigger.
+
+SCRUM-15 implementation: `SharingService` is the only writer. It upserts the row on `ON CONFLICT (group_id, user_id)`, always sends both flags explicitly (the column defaults are never relied on), and sets `updated_at = clock_timestamp()` only when a flag or `expires_at` changes. A missing row, or one whose `expires_at` has passed, is treated as not sharing by the sharing, read and upload code; the expiry is applied when reading, so no background job updates the row.
 
 ### `locations`
 
@@ -167,8 +170,11 @@ Creating a membership does not automatically create a `shares` row. The `TRUE` d
 | `accuracy_m` | `DOUBLE PRECISION` | Nullable; if set, must be non-negative. Unit is metres. |
 | `recorded_at` | `TIMESTAMPTZ` | Required; time supplied for when the location was recorded. |
 | `received_at` | `TIMESTAMPTZ` | Required; defaults to current time when received by the server. |
+| `client_upload_id` | `UUID` | Nullable internal retry key added by V2 on the SCRUM-43 branch; unique together with group and user when supplied. Not an API response field. |
 
 An index supports reading a member's locations in a group ordered by `recorded_at` descending. The schema has no PostGIS geometry column; coordinates are stored as numeric latitude/longitude.
+
+`V2__location_upload_idempotency.sql` adds the retry column and unique constraint without changing V1 or existing rows. The upload API generates its UUID and receipt time explicitly; SQL fixture inserts may still use the database defaults. The migration is branch-only until reviewed and merged.
 
 ### `zones`
 
