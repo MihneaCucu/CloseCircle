@@ -2,6 +2,7 @@ package com.closecircle.api.error;
 
 import java.util.List;
 
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -45,6 +46,17 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 "The request body is missing or is not valid JSON.");
         problem.setTitle("Malformed request");
         problem.setProperty("code", "MALFORMED_REQUEST");
+        return handleExceptionInternal(ex, problem, headers, HttpStatus.BAD_REQUEST, request);
+    }
+
+    /** A path or query parameter of the wrong type, for example {@code ?limit=abc} or a non-UUID ID. */
+    @Override
+    protected ResponseEntity<Object> handleTypeMismatch(TypeMismatchException ex,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        String name = ex.getPropertyName() == null ? "parameter" : ex.getPropertyName();
+        var problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Invalid value for '" + name + "'.");
+        problem.setTitle("Invalid parameter");
+        problem.setProperty("code", "INVALID_PARAMETER");
         return handleExceptionInternal(ex, problem, headers, HttpStatus.BAD_REQUEST, request);
     }
 

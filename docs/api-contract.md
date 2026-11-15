@@ -1,6 +1,6 @@
 # CloseCircle REST API contract
 
-**Status:** Draft v0.1 — proposed for review under SCRUM-42. The route and payload proposals below are not implemented or team-approved yet. Android, React, simulator, and backend owners must review the open decisions before client implementation. Currently implemented HTTP endpoints: `GET /actuator/health`, `GET /actuator/info`, and (SCRUM-41) `POST /api/v1/auth/register`, `POST /api/v1/auth/login` and `GET /api/v1/users/me`.
+**Status:** Draft v0.1 — proposed for review under SCRUM-42. The route and payload proposals below are not implemented or team-approved yet. Android, React, simulator, and backend owners must review the open decisions before client implementation. Currently implemented HTTP endpoints: `GET /actuator/health`, `GET /actuator/info`, and (SCRUM-41) `POST /api/v1/auth/register`, `POST /api/v1/auth/login` and `GET /api/v1/users/me`; (SCRUM-11) `POST /api/v1/groups` and `GET /api/v1/groups`.
 
 This document defines the client-facing JSON contract. It is independent of PostgreSQL table names and columns. Persisted schema changes are versioned separately with Flyway under `backend/src/main/resources/db/migration/`.
 
@@ -204,6 +204,8 @@ Successful registration (`201`) and login (`200`) return the same shape; a respo
   "memberCount": 1
 }
 ```
+
+Creating a group makes the caller its `OWNER` in the same transaction (the Jira story's "administrator"; `OWNER` has every `ADMIN` permission), so the response always has `myRole: "OWNER"` and `memberCount: 1`. `name` is trimmed and must be 1-100 characters. `GET /groups` lists only groups the caller belongs to, newest first by `(createdAt, groupId)`; an invalid `cursor` returns `400 INVALID_CURSOR` and a non-numeric `limit` returns `400 INVALID_PARAMETER`.
 
 `GET /groups/{groupId}` returns the same group shape. `PATCH /groups/{groupId}` accepts `{"name":"Hiking crew"}` and returns the updated group. Successful group or member removal returns `204` with no body. Member lists contain only `userId`, `displayName`, `role`, and `joinedAt`; they never expose email unless a future contract explicitly approves it.
 
