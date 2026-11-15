@@ -55,6 +55,10 @@ jobs:
         working-directory: backend
         run: python3 src/test/python/check_location_recovery.py
 
+      - name: Verify authenticated location uploads against PostgreSQL
+        working-directory: backend
+        run: python3 src/test/python/check_location_upload.py
+
       - name: Build backend Docker image
         run: docker build --tag closecircle-api:ci --file backend/Dockerfile backend
 

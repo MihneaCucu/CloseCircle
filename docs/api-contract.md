@@ -413,6 +413,16 @@ Accuracy and freshness are independent and never grant visibility. This is imple
 
 The read endpoint preserves the saved point and its original timestamps when no new recording arrives, including across API/database restart. A delayed older recording does not replace a more recent recorded point; a new accepted recording is visible on the next read, subject to current membership/sharing checks. SCRUM-21 verifies these behaviours against PostgreSQL. This does not implement or verify upload ingestion, mobile offline caching/retries, or a device connectivity signal. See [location-recovery.md](location-recovery.md) for coverage and the remaining end-to-end work.
 
+### Location upload (SCRUM-43 development branch)
+
+The SCRUM-43 branch implements `POST /groups/{groupId}/locations` on top of the unmerged location-read dependencies. It accepts exactly the documented latitude, longitude, nullable/optional `accuracyM` and required offset timestamp `recordedAt`; unknown fields and non-finite/out-of-range measurements return `400 INVALID_LOCATION`. Timestamps are normalized to microsecond UTC precision. Identity and receipt time are server-derived.
+
+Current membership is required (`404 GROUP_NOT_FOUND` otherwise). Missing sharing preferences or either disabled sharing flag returns `403 LOCATION_SHARING_DISABLED`. A recording before the current preference update returns `403 LOCATION_CONSENT_CHANGED`. This conservative consent-boundary rule is implemented for team review; it does not approve retention or upload while sharing is off. Future clock tolerance is configured with `closecircle.location.upload-max-future-seconds` (integer 0-300, default 0); the earlier five-minute proposal is not an implicit default.
+
+An optional UUID `Idempotency-Key` header makes retries safe within the authenticated user/group. A new write returns `201 Location`; an identical retry returns `200` with the saved representation; different payload for the same key returns `409 IDEMPOTENCY_CONFLICT`. Authorization is rechecked on retries. Without a key, repeated POSTs create separate recordings. New upload responses use `Cache-Control: no-store`; older recorded points never replace newer ones in the latest-location read.
+
+This is implemented and tested on the feature branch, not deployed or accepted as a whole story. See [location-upload.md](location-upload.md) for error, configuration, migration and test details, and [checkpoint-2-readiness.md](checkpoint-2-readiness.md) for the story-count boundary.
+
 The latest-location read endpoint rejects non-canonical JWT UUID subjects with `401 INVALID_TOKEN` and a Bearer challenge. Invalid path/query types return `400 INVALID_PARAMETER`; malformed, unrepresentable or sub-microsecond cursors return `400 INVALID_CURSOR`. These local errors use Problem Details and `Cache-Control: no-store` without echoing input values.
 
 ## 5. Pagination and filtering

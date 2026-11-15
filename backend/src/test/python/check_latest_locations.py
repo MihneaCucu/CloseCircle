@@ -28,7 +28,7 @@ def b64(value):
     return base64.urlsafe_b64encode(value).rstrip(b'=').decode()
 
 
-def main(verify=None, app_args=(), verify_recovery=None):
+def main(verify=None, app_args=(), verify_recovery=None, verify_upload=None):
     if not __debug__:
         raise SystemExit('Run without Python optimization so assertions are enabled.')
     backend = Path(__file__).resolve().parents[3]
@@ -178,6 +178,8 @@ def main(verify=None, app_args=(), verify_recovery=None):
                     verify(sql, request, group, other_group, ids)
                 if verify_recovery is not None:
                     verify_recovery(sql, request, restart_app, group, other_group, ids)
+                if verify_upload is not None:
+                    verify_upload(sql, request, restart_app, base, token, group, other_group, ids)
                 status, problem = request(ids[0], '?cursor=not-valid')
                 assert status == 400 and problem['code'] == 'INVALID_CURSOR'
                 for value in ('+999999999-01-01T00:00:00Z/' + ids[1],

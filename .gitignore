@@ -19,6 +19,7 @@ local.properties
 
 # Python regression checks
 __pycache__/
+*.py[cod]
 
 # macOS
 .DS_Store
@@ -30,7 +31,3 @@ __pycache__/
 skills-lock.json
 
 node_modules/
-
-# Python regression caches
-__pycache__/
-*.py[cod]
