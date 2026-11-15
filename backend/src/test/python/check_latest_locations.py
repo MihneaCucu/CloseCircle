@@ -209,8 +209,10 @@ def main(verify=None, app_args=(), verify_recovery=None, verify_upload=None):
             # The temporary directory is deleted on exit; keep the server-side error visible in CI.
             log_file = Path(temp) / 'app.log'
             if log_file.exists():
-                print('--- last backend log lines ---\n' + '\n'.join(log_file.read_text().splitlines()[-60:]),
-                      file=sys.stderr)
+                # Skip stack frames so the exception messages and "Caused by" lines fit.
+                lines = [line for line in log_file.read_text().splitlines()
+                         if line.strip() and not line.lstrip().startswith(('at ', '... '))]
+                print('--- last backend log lines ---\n' + '\n'.join(lines[-40:]), file=sys.stderr)
             raise
         finally:
             stop_app()
