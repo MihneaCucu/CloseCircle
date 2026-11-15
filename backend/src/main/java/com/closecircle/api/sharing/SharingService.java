@@ -63,9 +63,8 @@ public class SharingService {
         return jdbc.queryForObject("""
                 WITH t AS (SELECT clock_timestamp() AS at)
                 INSERT INTO shares (group_id, user_id, sharing_enabled, share_live_location, expires_at, updated_at)
-                SELECT CAST(? AS uuid), CAST(? AS uuid), CAST(? AS boolean), CAST(? AS boolean),
-                       t.at + make_interval(mins => CAST(? AS integer)), t.at
-                FROM t
+                VALUES (CAST(? AS uuid), CAST(? AS uuid), CAST(? AS boolean), CAST(? AS boolean),
+                        (SELECT at FROM t) + make_interval(mins => CAST(? AS integer)), (SELECT at FROM t))
                 ON CONFLICT (group_id, user_id) DO UPDATE
                 SET sharing_enabled = EXCLUDED.sharing_enabled,
                     share_live_location = EXCLUDED.share_live_location,

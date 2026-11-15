@@ -110,7 +110,8 @@ def verify(sql, latest, restart, base, token, group, other_group, ids):
     # Turning sharing on makes the member visible to that group and allows uploads.
     before = datetime.now(timezone.utc)
     status, enabled = put(newcomer, on)
-    assert status == 200 and enabled['groupId'] == group and enabled['userId'] == newcomer
+    assert status == 200, f'Enabling sharing failed: HTTP {status} {enabled}'
+    assert enabled['groupId'] == group and enabled['userId'] == newcomer
     assert enabled['sharingEnabled'] is True and enabled['shareLiveLocation'] is True
     assert instant(enabled['updatedAt']) >= before.replace(microsecond=0)
     assert get(newcomer) == (200, enabled)
