@@ -1,6 +1,6 @@
 # CloseCircle REST API contract
 
-**Status:** Draft v0.1 — proposed for review under SCRUM-42. Android, React, simulator, and backend owners must review the open decisions before client implementation. The `dev` baseline includes infrastructure health/info, latest-member-location reads and own-location uploads, with optional freshness/accuracy metadata. PRs #1-5 were reviewed and merged on 15 November 2026. The SCRUM-15 per-group sharing settings routes (`GET`/`PUT`/`DELETE /api/v1/groups/{groupId}/me/sharing` and `GET /api/v1/users/me/sharing`, SCRUM-15/16/17/18) are implemented on their feature branch. Other business routes remain proposals until their owners integrate them.
+**Status:** Draft v0.1 — proposed for review under SCRUM-42. Android, React, simulator, and backend owners must review the open decisions before client implementation. The `dev` baseline includes infrastructure health/info, latest-member-location reads and own-location uploads, with optional freshness/accuracy metadata. PRs #1-5 were reviewed and merged on 15 November 2026. The SCRUM-15 per-group sharing settings routes (`GET`/`PUT`/`DELETE /api/v1/groups/{groupId}/me/sharing` and `GET /api/v1/users/me/sharing`, SCRUM-15/16/17/18) are implemented on their feature branch. SCRUM-41 adds account registration and login (`POST /api/v1/auth/register`, `POST /api/v1/auth/login`) and `GET /api/v1/users/me`; SCRUM-11 adds group creation and listing (`POST /api/v1/groups`, `GET /api/v1/groups`). Other business routes remain proposals until their owners integrate them.
 
 For the merged SCRUM-19/20/21/22/43 location backend, use the [machine-readable integration contract](contracts/README.md). It records tested read/upload behavior, including configurable metadata, offset timestamp normalization, conservative consent checks and idempotent retries. It is a review draft; these routes are implemented in this checkout, while deployed availability and client acceptance must be checked separately. Its feature details take precedence over older location proposals below for integration testing, without implying team approval.
 
@@ -28,7 +28,7 @@ The merged backend implements the latest-location read and upload routes describ
 
 ## 2. Authentication and access model
 
-The infrastructure currently verifies HS256 signatures and issuer `closecircle`; token issuance and authorization claim mapping are not implemented. The proposed contract requires `sub`, `iat`, and `exp` claims, but the backend must explicitly require them when token issuance is implemented. Password policy, token lifetime, and authorization claim mapping require approval (see [Open decisions](#10-open-decisions-for-scrum-42-review)).
+Registration and login issue HS256 access tokens signed with `JWT_SECRET` (SCRUM-41). Every protected request is checked for a valid signature, issuer `closecircle`, an `exp` that has not passed, and a canonical UUID `sub`; a token missing `exp` or `sub` is rejected. Tokens are valid for 1 hour by default (`JWT_ACCESS_TOKEN_TTL`, e.g. `30m`, `1h`). After expiry, protected routes return `401` and the client must log in again. Every `401` from authentication carries `WWW-Authenticate: Bearer` and a Problem Details body: `code` is `INVALID_TOKEN` when a token was sent but rejected (bad signature, expired, wrong issuer, missing `exp`, non-UUID `sub`), and `AUTHENTICATION_REQUIRED` when no token was sent. The body does not say which check failed. Authorization claim mapping (group roles) remains open (see [Open decisions](#10-open-decisions-for-scrum-42-review)).
 
 Proposed access token claims:
 
@@ -146,7 +146,8 @@ The examples in this section are normative shapes for the draft contract. All na
 `GroupSummary` is `{groupId, name, createdBy, createdAt, myRole, memberCount}`. `GroupDetails` contains the same fields. In a member-list response, each `Member` is `{userId, displayName, role, joinedAt}`. `myRole` describes only the caller's membership and must not be trusted by the server for authorization.
 
 - `email`: trim surrounding whitespace, validate as an email address, maximum 320 characters; comparisons are case-insensitive. Registration uniqueness conflicts return `409`.
-- `password`: never echoed or logged; minimum 12 characters is proposed, with a maximum of 128 characters. Password hashing and any breach screening are backend responsibilities. The minimum requires team approval.
+- `password`: never echoed or logged; minimum 12 characters and maximum 72 bytes in UTF-8 (BCrypt ignores anything longer, so longer passwords are rejected rather than silently truncated). Stored only as a BCrypt hash. Breach screening is not implemented.
+- Login with an unknown email or a wrong password returns the same `401 INVALID_CREDENTIALS` body, so the response does not reveal whether an account exists. Registration with an existing email (compared case-insensitively) returns `409 EMAIL_ALREADY_REGISTERED`.
 - `displayName`, group `name`, zone `name`: non-empty after trimming; proposed maximum 100 characters.
 - `role`: exactly `OWNER`, `ADMIN`, or `MEMBER`; clients cannot assign `OWNER` through member-management routes.
 - Path parameters ending in `Id` must parse as UUIDs; invalid UUIDs return `400`.
@@ -207,6 +208,8 @@ Successful registration (`201`) and login (`200`) return the same shape; a respo
   "memberCount": 1
 }
 ```
+
+Creating a group makes the caller its `OWNER` in the same transaction (the Jira story's "administrator"; `OWNER` has every `ADMIN` permission), so the response always has `myRole: "OWNER"` and `memberCount: 1`. `name` is trimmed and must be 1-100 characters. `GET /groups` lists only groups the caller belongs to, newest first by `(createdAt, groupId)`; an invalid `cursor` returns `400 INVALID_CURSOR` and a non-numeric `limit` returns `400 INVALID_PARAMETER`.
 
 `GET /groups/{groupId}` returns the same group shape. `PATCH /groups/{groupId}` accepts `{"name":"Hiking crew"}` and returns the updated group. Successful group or member removal returns `204` with no body. Member lists contain only `userId`, `displayName`, `role`, and `joinedAt`; they never expose email unless a future contract explicitly approves it.
 
@@ -540,7 +543,7 @@ Sensitive-data rules apply end to end: do not log request bodies, Authorization 
 | Decision | Current proposal | Owner(s) to confirm | Blocks |
 | --- | --- | --- | --- |
 | Registration and login | Email + password; JWT access token; no refresh/logout endpoint in v1 | Backend, Android | Auth implementation |
-| Password policy and token lifetime | Password minimum 12 characters; JWT duration to be selected; no revocation without state | Backend, security | Auth implementation |
+| Password policy and token lifetime | **Implemented in SCRUM-41:** password 12 characters to 72 UTF-8 bytes; 1-hour access token, configurable; no revocation without state | Backend, security | — |
 | Email verification and invite delivery | One-time hashed invitation token; delivery channel/provider not selected | Product, backend | Invitations |
 | Owner transfer and group deletion | Owner-only deletion; owner must transfer before leaving; deletion retention behavior TBD | Product, backend | Group administration |
 | Role capabilities | Matrix in section 2; owner-only role changes and atomic transfer proposed | Product, Android, backend | Authorization and admin UI |

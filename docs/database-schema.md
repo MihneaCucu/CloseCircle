@@ -216,5 +216,5 @@ A partial index supports listing a recipient's unread notifications by newest fi
 - Flyway applies versioned SQL from `backend/src/main/resources/db/migration/`.
 - Add a new migration such as `V2__...sql` for schema changes; do not edit an already-applied migration in a shared database.
 - Hibernate uses `ddl-auto: validate`, so it checks mappings against the migrated database and does not create or modify tables.
-- The current Java backend source has the migration and database/security configuration, but no persistence entity or repository classes yet; use this document and V1 as the mapping guide when implementing them.
+- JPA entities exist for `users` (`api.user.User`), `groups` (`api.group.Group`, entity name `CircleGroup` because `GROUP` is a JPQL keyword) and `group_members` (`api.group.GroupMember`, composite key). Use this document and V1 as the mapping guide for the remaining tables. Set timestamp and role columns explicitly in Java: Hibernate inserts `NULL` for unset fields instead of applying the column default.
 - Keep API JSON contracts separate from table structure. See [`api-contract.md`](api-contract.md); its business endpoints are a draft and are not implied by the existence of these tables.
