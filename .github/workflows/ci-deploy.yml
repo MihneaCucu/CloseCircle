@@ -67,6 +67,10 @@ jobs:
         working-directory: backend
         run: python3 src/test/python/check_sharing_revocation.py
 
+      - name: Verify temporary sharing against PostgreSQL
+        working-directory: backend
+        run: python3 src/test/python/check_temporary_sharing.py
+
       - name: Build backend Docker image
         run: docker build --tag closecircle-api:ci --file backend/Dockerfile backend
 

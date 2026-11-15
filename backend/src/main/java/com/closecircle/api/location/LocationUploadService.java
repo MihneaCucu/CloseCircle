@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class LocationUploadService {
     public record Result(LatestLocationService.Location location, boolean created) { }
-    private record Sharing(boolean enabled, boolean live, java.time.Instant updatedAt) { }
+    private record Sharing(boolean active, java.time.Instant updatedAt, java.time.Instant expiresAt) { }
 
     private static final RowMapper<LatestLocationService.Location> LOCATION = (rs, row) ->
             new LatestLocationService.Location(rs.getObject("location_id", UUID.class),
@@ -42,17 +42,29 @@ public class LocationUploadService {
         if (membership.isEmpty()) {
             throw LocationUploadRequest.failure(HttpStatus.NOT_FOUND, "GROUP_NOT_FOUND", "Group not found");
         }
+        // Temporary sharing (SCRUM-17) counts as disabled from expires_at onwards.
         List<Sharing> shares = jdbc.query("""
-                SELECT sharing_enabled, share_live_location, updated_at FROM shares
-                WHERE group_id = ? AND user_id = ? FOR UPDATE
-                """, (rs, row) -> new Sharing(rs.getBoolean(1), rs.getBoolean(2),
-                        rs.getObject(3, OffsetDateTime.class).toInstant()), groupId, userId);
-        if (shares.isEmpty() || !shares.getFirst().enabled() || !shares.getFirst().live()) {
+                SELECT sharing_enabled AND share_live_location
+                           AND (expires_at IS NULL OR expires_at > clock_timestamp()),
+                       updated_at, expires_at
+                FROM shares WHERE group_id = ? AND user_id = ? FOR UPDATE
+                """, (rs, row) -> {
+                    OffsetDateTime expiresAt = rs.getObject(3, OffsetDateTime.class);
+                    return new Sharing(rs.getBoolean(1), rs.getObject(2, OffsetDateTime.class).toInstant(),
+                            expiresAt == null ? null : expiresAt.toInstant());
+                }, groupId, userId);
+        if (shares.isEmpty() || !shares.getFirst().active()) {
             throw LocationUploadRequest.failure(HttpStatus.FORBIDDEN, "LOCATION_SHARING_DISABLED",
                     "Location sharing is not enabled");
         }
         var receivedAt = policy.receivedAt();
         policy.validate(request.recordedAt(), shares.getFirst().updatedAt(), receivedAt);
+        // With a future clock tolerance, a recording could claim a time after sharing expires.
+        var expiresAt = shares.getFirst().expiresAt();
+        if (expiresAt != null && !request.recordedAt().isBefore(expiresAt)) {
+            throw LocationUploadRequest.failure(HttpStatus.FORBIDDEN, "LOCATION_SHARING_DISABLED",
+                    "Recording is after location sharing expires");
+        }
         if (uploadKey != null) {
             List<LatestLocationService.Location> previous = jdbc.query("""
                     SELECT location_id, group_id, user_id, latitude, longitude, accuracy_m, recorded_at, received_at

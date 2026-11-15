@@ -25,13 +25,13 @@ class SharingRequestTest {
 
     @Test
     void parsesEachCombinationOfFlags() throws Exception {
-        assertEquals(new SharingUpdateRequest(true, true),
+        assertEquals(new SharingUpdateRequest(true, true, null),
                 parse("{\"sharingEnabled\":true,\"shareLiveLocation\":true}"));
-        assertEquals(new SharingUpdateRequest(false, true),
+        assertEquals(new SharingUpdateRequest(false, true, null),
                 parse("{\"shareLiveLocation\":true,\"sharingEnabled\":false}"));
-        assertEquals(new SharingUpdateRequest(true, false),
+        assertEquals(new SharingUpdateRequest(true, false, null),
                 parse("{\"sharingEnabled\":true,\"shareLiveLocation\":false}"));
-        assertEquals(new SharingUpdateRequest(false, false),
+        assertEquals(new SharingUpdateRequest(false, false, null),
                 parse("{\"sharingEnabled\":false,\"shareLiveLocation\":false}"));
     }
 
@@ -58,10 +58,32 @@ class SharingRequestTest {
     }
 
     @Test
+    void parsesAnOptionalDurationInWholeMinutes() throws Exception {
+        assertEquals(new SharingUpdateRequest(true, true, 60),
+                parse("{\"sharingEnabled\":true,\"shareLiveLocation\":true,\"durationMinutes\":60}"));
+        assertEquals(new SharingUpdateRequest(true, true, 1),
+                parse("{\"sharingEnabled\":true,\"shareLiveLocation\":true,\"durationMinutes\":1}"));
+        assertEquals(new SharingUpdateRequest(true, true, SharingUpdateRequest.MAX_DURATION_MINUTES),
+                parse("{\"sharingEnabled\":true,\"shareLiveLocation\":true,\"durationMinutes\":10080}"));
+        assertEquals(new SharingUpdateRequest(true, true, null),
+                parse("{\"sharingEnabled\":true,\"shareLiveLocation\":true,\"durationMinutes\":null}"));
+    }
+
+    @Test
+    void rejectsInvalidDurations() {
+        for (String duration : new String[] {"0", "-1", "10081", "1.5", "\"60\"", "true", "{}", "2147483648"}) {
+            assertInvalid("{\"sharingEnabled\":true,\"shareLiveLocation\":true,\"durationMinutes\":" + duration + "}");
+        }
+        // A duration only makes sense when turning sharing on.
+        assertInvalid("{\"sharingEnabled\":false,\"shareLiveLocation\":true,\"durationMinutes\":60}");
+        assertThrows(ResponseStatusException.class, () -> new SharingUpdateRequest(false, false, 60));
+    }
+
+    @Test
     void notSharedDefaultHasNoTimestamp() {
         var group = UUID.randomUUID();
         var user = UUID.randomUUID();
-        assertEquals(new SharingSettings(group, user, false, false, null), SharingSettings.notShared(group, user));
+        assertEquals(new SharingSettings(group, user, false, false, null, null), SharingSettings.notShared(group, user));
     }
 
     private static Jwt jwt(String subject) {

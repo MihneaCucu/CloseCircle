@@ -102,7 +102,8 @@ def verify(sql, latest, restart, base, token, group, other_group, ids):
     # A member who never saved preferences is not sharing and is not visible.
     status, settings = get(newcomer)
     assert status == 200 and settings == {'groupId': group, 'userId': newcomer, 'sharingEnabled': False,
-                                          'shareLiveLocation': False, 'updatedAt': None}
+                                          'shareLiveLocation': False, 'expiresAt': None,
+                                          'updatedAt': None}
     assert visible_to(viewer, newcomer) is None
     assert upload(newcomer)[0] == 403
 
