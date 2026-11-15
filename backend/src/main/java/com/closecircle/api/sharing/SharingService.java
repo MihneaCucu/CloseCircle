@@ -85,6 +85,30 @@ public class SharingService {
         return update(groupId, userId, new SharingUpdateRequest(false, false, null));
     }
 
+    /**
+     * Groups where other members can see the caller's location right now: the same rule as the latest-locations
+     * read (both flags on and not expired). Removed memberships drop out through the shares foreign key.
+     */
+    @Transactional(readOnly = true)
+    public List<SharedGroups.Item> activeGroups(UUID userId) {
+        // One clock reading for the whole query, so a listed group always has remainingSeconds >= 1.
+        return jdbc.query("""
+                WITH t AS (SELECT clock_timestamp() AS at)
+                SELECT s.group_id, g.name, s.expires_at, s.updated_at,
+                       CAST(CEIL(EXTRACT(EPOCH FROM (s.expires_at - t.at))) AS bigint) AS remaining_seconds
+                FROM shares s
+                JOIN groups g ON g.group_id = s.group_id
+                CROSS JOIN t
+                WHERE s.user_id = ? AND s.sharing_enabled AND s.share_live_location
+                  AND (s.expires_at IS NULL OR s.expires_at > t.at)
+                ORDER BY lower(g.name), g.group_id
+                """, (rs, row) -> new SharedGroups.Item(
+                        rs.getObject("group_id", UUID.class), rs.getString("name"),
+                        instant(rs.getObject("expires_at", OffsetDateTime.class)),
+                        rs.getObject("remaining_seconds", Long.class),
+                        rs.getObject("updated_at", OffsetDateTime.class).toInstant()), userId);
+    }
+
     private static Instant instant(OffsetDateTime value) {
         return value == null ? null : value.toInstant();
     }
