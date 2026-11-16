@@ -71,7 +71,7 @@ fun MapScreen(ui: UiState, vm: AppViewModel, onManage: () -> Unit, onSettings: (
         Box(Modifier.fillMaxWidth().height(mapHeight)) {
             LiveMap(ui.members, key = group.id, modifier = Modifier.fillMaxSize())
             Text(
-                "© OpenStreetMap",
+                "© OpenFreeMap · © OpenStreetMap",
                 Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = mapHeight * 0.12f + 2.dp).clip(RoundedCornerShape(4.dp)).background(c.surface.copy(alpha = 0.8f)).padding(horizontal = 6.dp, vertical = 2.dp),
                 color = c.muted, fontSize = 10.sp,
             )
