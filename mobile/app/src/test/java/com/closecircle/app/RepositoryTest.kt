@@ -72,7 +72,6 @@ class RepositoryTest {
         assertEquals("±13 m", ana.accuracy)
         assertNull(mihai.minutesAgo)
         assertEquals("Nicio actualizare", mihai.accuracy)
-        assertEquals(0, mihai.x) // no position, so not drawn on the map
     }
 
     @Test
@@ -84,20 +83,13 @@ class RepositoryTest {
     }
 
     @Test
-    fun membersAreSpreadByCoordinatesWithNorthUp() = runBlocking {
-        api.latest["g1"] = listOf(latest("north-west", "A", 45.0, 25.0), latest("south-east", "B", 44.0, 27.0))
-        val (nw, se) = repo.members("g1", NOW)
-        assertTrue(nw.x < se.x)
-        assertTrue(nw.y < se.y) // larger latitude is higher on screen, so a smaller y
-        assertTrue(nw.x in 1..99 && se.y in 1..99)
-    }
-
-    @Test
-    fun aSingleMemberSitsInTheMiddle() = runBlocking {
-        api.latest["g1"] = listOf(latest("u1", "Ana", 44.4, 26.1))
-        val ana = repo.members("g1", NOW).single()
-        assertEquals(45, ana.x)
-        assertTrue(ana.y in 40..80)
+    fun membersCarryTheirRealCoordinates() = runBlocking {
+        api.latest["g1"] = listOf(latest("u1", "Ana", 44.4268, 26.1025), latest("u2", "Mihai", null))
+        val (ana, mihai) = repo.members("g1", NOW)
+        assertEquals(44.4268, ana.latitude!!, 0.0)
+        assertEquals(26.1025, ana.longitude!!, 0.0)
+        assertNull(mihai.latitude)
+        assertNull(mihai.longitude)
     }
 
     @Test

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -43,19 +42,16 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.closecircle.app.data.Group
-import com.closecircle.app.data.Member
-import com.closecircle.app.domain.Freshness
-import com.closecircle.app.domain.freshnessOf
 import com.closecircle.app.domain.leftText
 import com.closecircle.app.ui.AppViewModel
 import com.closecircle.app.ui.Dot
+import com.closecircle.app.data.Member
 import com.closecircle.app.ui.FreshChip
 import com.closecircle.app.ui.GearButton
-import com.closecircle.app.ui.MapCanvas
+import com.closecircle.app.ui.LiveMap
 import com.closecircle.app.ui.MemberAvatar
 import com.closecircle.app.ui.PillButton
 import com.closecircle.app.ui.UiState
@@ -73,10 +69,12 @@ fun MapScreen(ui: UiState, vm: AppViewModel, onManage: () -> Unit, onSettings: (
     BoxWithConstraints(Modifier.fillMaxSize().background(c.bg)) {
         val mapHeight = maxHeight * 0.50f
         Box(Modifier.fillMaxWidth().height(mapHeight)) {
-            MapCanvas()
-            BoxWithConstraints(Modifier.fillMaxSize()) {
-                ui.members.filter { it.x > 0 }.forEach { m -> Pin(m, maxWidth * m.x / 100 - 22.dp, maxHeight * m.y / 100 - 22.dp) }
-            }
+            LiveMap(ui.members, key = group.id, modifier = Modifier.fillMaxSize())
+            Text(
+                "© OpenStreetMap",
+                Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = mapHeight * 0.12f + 2.dp).clip(RoundedCornerShape(4.dp)).background(c.surface.copy(alpha = 0.8f)).padding(horizontal = 6.dp, vertical = 2.dp),
+                color = c.muted, fontSize = 10.sp,
+            )
             Column(Modifier.statusBarsPadding().padding(16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     GroupPill(ui, vm, Modifier.weight(1f))
@@ -122,21 +120,6 @@ private fun NoGroup(loaded: Boolean, vm: AppViewModel) {
         OutlinedTextField(name, { name = it.take(100); error = null }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Numele grupului") }, isError = error != null)
         error?.let { Text(it, Modifier.padding(top = 4.dp), color = c.red, fontSize = 12.sp) }
         PillButton("Creează grupul", { error = vm.createGroup(name) }, Modifier.padding(top = 16.dp).fillMaxWidth())
-    }
-}
-
-@Composable
-private fun Pin(m: Member, x: Dp, y: Dp) {
-    val c = Cc.colors
-    Column(Modifier.offset(x, y), horizontalAlignment = Alignment.CenterHorizontally) {
-        Surface(shape = CircleShape, shadowElevation = 4.dp, color = c.surface) { MemberAvatar(m, 44.dp) }
-        if (freshnessOf(m.minutesAgo) == Freshness.LAST_KNOWN) {
-            Text(
-                "acum ${m.minutesAgo} min",
-                Modifier.padding(top = 4.dp).clip(CircleShape).background(c.surface).padding(horizontal = 8.dp, vertical = 2.dp),
-                fontSize = 10.sp, fontWeight = FontWeight.Bold, color = c.text,
-            )
-        }
     }
 }
 
