@@ -15,9 +15,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -62,7 +66,8 @@ fun CcCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
         color = c.surface,
-        shadowElevation = 1.dp,
+        shadowElevation = if (Cc.elder) 0.dp else 1.dp,
+        border = if (Cc.elder) BorderStroke(2.dp, c.text) else null,
         content = content,
     )
 }
@@ -138,7 +143,7 @@ fun CcSwitch(checked: Boolean, onChange: (Boolean) -> Unit, label: String, enabl
     )
 }
 
-/** Pill button. */
+/** Pill button; at least 56 dp tall in elderly mode. */
 @Composable
 fun PillButton(
     text: String,
@@ -151,7 +156,7 @@ fun PillButton(
 ) {
     Button(
         onClick = onClick,
-        modifier = modifier.heightIn(min = 48.dp),
+        modifier = modifier.heightIn(min = if (Cc.elder) 56.dp else 48.dp),
         enabled = enabled,
         shape = CircleShape,
         border = border,
@@ -209,4 +214,14 @@ fun Modifier.outlined(selected: Boolean): Modifier {
         .clip(CircleShape)
         .background(if (selected) c.accentSoft else c.surface)
         .border(1.dp, if (selected) c.accent else c.line, CircleShape)
+}
+
+@Composable
+fun GearButton(onClick: () -> Unit) {
+    val c = Cc.colors
+    Surface(shape = CircleShape, color = c.surface, shadowElevation = 2.dp, modifier = Modifier.size(44.dp)) {
+        IconButton(onClick = onClick) {
+            Icon(Icons.Outlined.Settings, contentDescription = "Setări", tint = c.text)
+        }
+    }
 }

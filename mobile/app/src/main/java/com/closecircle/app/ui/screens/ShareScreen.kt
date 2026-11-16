@@ -50,6 +50,7 @@ import com.closecircle.app.ui.AppViewModel
 import com.closecircle.app.ui.Cap
 import com.closecircle.app.ui.CcCard
 import com.closecircle.app.ui.CcSwitch
+import com.closecircle.app.ui.GearButton
 import com.closecircle.app.ui.MIN_CUSTOM_MIN
 import com.closecircle.app.ui.PillButton
 import com.closecircle.app.ui.UiState
@@ -61,8 +62,9 @@ private val PRESETS = listOf(30 to "30 min", 120 to "2 h", 720 to "12 h", 1440 t
 private const val MAX_CUSTOM_MIN = 7 * 24 * 60
 
 @Composable
-fun ShareScreen(ui: UiState, vm: AppViewModel) {
+fun ShareScreen(ui: UiState, vm: AppViewModel, onSettings: () -> Unit) {
     val c = Cc.colors
+    val elder = Cc.elder
     var confirmStop by remember { mutableStateOf(false) }
     var customFor by remember { mutableStateOf<Group?>(null) }
 
@@ -70,8 +72,11 @@ fun ShareScreen(ui: UiState, vm: AppViewModel) {
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 28.dp, bottom = 8.dp)) {
             item {
                 Column(Modifier.statusBarsPadding()) {
-                    Text("Partajarea mea", color = c.text, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 38.sp)
-                    Text("Tu decizi cine te vede, cât timp, separat pentru fiecare grup.", Modifier.padding(top = 6.dp, bottom = 4.dp), color = c.muted, fontSize = 15.sp)
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Partajarea mea", Modifier.weight(1f), color = c.text, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 38.sp)
+                        GearButton(onSettings)
+                    }
+                    if (!elder) Text("Tu decizi cine te vede, cât timp, separat pentru fiecare grup.", Modifier.padding(top = 6.dp, bottom = 4.dp), color = c.muted, fontSize = 15.sp)
                     Spacer(Modifier.height(16.dp))
                 }
             }
@@ -79,10 +84,10 @@ fun ShareScreen(ui: UiState, vm: AppViewModel) {
                 item { Text("Nu ești într-un grup. Creează unul din ecranul Hartă.", color = c.muted, fontSize = 14.sp) }
             }
             items(ui.groups, key = { it.id }) { g ->
-                GroupCard(g, ui.now, onToggle = { vm.toggleGroup(g) }, onQuick = { id, label -> vm.pickDuration(g, id, label) }, onCustom = { customFor = g })
+                GroupCard(g, ui.now, elder, onToggle = { vm.toggleGroup(g) }, onQuick = { id, label -> vm.pickDuration(g, id, label) }, onCustom = { customFor = g })
                 Spacer(Modifier.height(12.dp))
             }
-            item {
+            if (!elder) item {
                 Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Icon(Icons.Outlined.Info, null, tint = c.muted, modifier = Modifier.size(18.dp))
                     Text(
@@ -117,7 +122,7 @@ fun ShareScreen(ui: UiState, vm: AppViewModel) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun GroupCard(g: Group, now: Long, onToggle: () -> Unit, onQuick: (DurId, String) -> Unit, onCustom: () -> Unit) {
+private fun GroupCard(g: Group, now: Long, elder: Boolean, onToggle: () -> Unit, onQuick: (DurId, String) -> Unit, onCustom: () -> Unit) {
     val c = Cc.colors
     CcCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
@@ -131,7 +136,7 @@ private fun GroupCard(g: Group, now: Long, onToggle: () -> Unit, onQuick: (DurId
                 }
                 CcSwitch(g.on, { onToggle() }, "Partajare ${g.name}")
             }
-            if (g.on) {
+            if (g.on && !elder) {
                 Spacer(Modifier.height(16.dp))
                 Cap("DURATĂ")
                 Spacer(Modifier.height(8.dp))

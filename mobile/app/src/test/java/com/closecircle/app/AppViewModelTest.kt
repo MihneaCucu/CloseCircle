@@ -3,6 +3,7 @@ package com.closecircle.app
 import com.closecircle.app.data.AppRepository
 import com.closecircle.app.data.DurId
 import com.closecircle.app.data.Session
+import com.closecircle.app.data.UserPrefs
 import com.closecircle.app.data.api.ApiException
 import com.closecircle.app.data.api.GroupDto
 import com.closecircle.app.data.api.LatestLocationDto
@@ -29,6 +30,7 @@ private const val NOW = 1_800_000_000_000L
 class AppViewModelTest {
     private val api = FakeApi()
     private val store = MemoryTokenStore()
+    private val prefsStore = MemoryDataStore()
 
     @Before
     fun setUp() {
@@ -39,7 +41,7 @@ class AppViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm() = AppViewModel(api, AppRepository(api), Session(store), clock = { NOW }, pollMs = null)
+    private fun vm() = AppViewModel(api, AppRepository(api), Session(store), UserPrefs(prefsStore), clock = { NOW }, pollMs = null)
 
     private fun signedIn(): AppViewModel {
         store.token = "saved"
@@ -234,5 +236,39 @@ class AppViewModelTest {
         assertTrue(key in v.ui.value.zoneNotify)
         v.showMessage("salut")
         assertEquals("salut", v.ui.value.toast)
+    }
+
+    @Test
+    fun elderModeIsOffByDefault() {
+        assertFalse(signedIn().ui.value.elder)
+    }
+
+    @Test
+    fun turningElderModeOnAppliesAtOnceAndIsKeptAfterTheAppIsReopened() {
+        val v = signedIn()
+        v.setElder(true)
+        assertTrue(v.ui.value.elder)
+        assertEquals("Mod pentru persoane în vârstă activat", v.ui.value.toast)
+        // closing and reopening the app is a new view model reading the same store
+        assertTrue(signedIn().ui.value.elder)
+    }
+
+    @Test
+    fun turningElderModeOffRestoresTheStandardInterface() {
+        val v = signedIn()
+        v.setElder(true)
+        v.setElder(false)
+        assertFalse(v.ui.value.elder)
+        assertEquals("Interfața standard a fost restabilită", v.ui.value.toast)
+        assertFalse(signedIn().ui.value.elder)
+    }
+
+    @Test
+    fun signingOutKeepsTheElderChoice() {
+        val v = signedIn()
+        v.setElder(true)
+        v.signOut()
+        assertTrue(v.ui.value.elder)
+        assertEquals(Auth.SignedOut(), v.ui.value.auth)
     }
 }

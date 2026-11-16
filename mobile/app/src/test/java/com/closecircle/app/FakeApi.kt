@@ -1,5 +1,8 @@
 package com.closecircle.app
 
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
 import com.closecircle.app.data.TokenStore
 import com.closecircle.app.data.api.ApiException
 import com.closecircle.app.data.api.AuthResponse
@@ -9,6 +12,16 @@ import com.closecircle.app.data.api.LatestLocationDto
 import com.closecircle.app.data.api.SharedGroupDto
 import com.closecircle.app.data.api.SharingDto
 import com.closecircle.app.data.api.UserDto
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+
+/** An in-memory DataStore: the file-backed one cannot replace its file on Windows, where developers run these tests. */
+class MemoryDataStore : DataStore<Preferences> {
+    private val state = MutableStateFlow(emptyPreferences())
+    override val data: Flow<Preferences> = state
+    override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences =
+        transform(state.value).also { state.value = it }
+}
 
 class MemoryTokenStore(var token: String? = null) : TokenStore {
     override suspend fun read() = token

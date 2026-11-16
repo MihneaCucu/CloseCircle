@@ -43,17 +43,21 @@ import com.closecircle.app.domain.isDelayed
 import com.closecircle.app.ui.AppViewModel
 import com.closecircle.app.ui.Cap
 import com.closecircle.app.ui.CcCard
+import com.closecircle.app.ui.GearButton
 import com.closecircle.app.ui.PillButton
 import com.closecircle.app.ui.UiState
 import com.closecircle.app.ui.theme.Cc
 
 // Invitations and zone alerts are not served by the backend yet; the lists come from PendingBackendData.
 @Composable
-fun AlertsScreen(ui: UiState, vm: AppViewModel) {
+fun AlertsScreen(ui: UiState, vm: AppViewModel, onSettings: () -> Unit) {
     val c = Cc.colors
     LazyColumn(Modifier.fillMaxSize().background(c.bg), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 28.dp, bottom = 24.dp)) {
         item {
-            Text("Alerte", Modifier.statusBarsPadding(), color = c.text, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 38.sp)
+            Row(Modifier.statusBarsPadding().fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Alerte", color = c.text, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 38.sp)
+                GearButton(onSettings)
+            }
         }
         items(ui.invites, key = { it.id }) { inv ->
             Column(
