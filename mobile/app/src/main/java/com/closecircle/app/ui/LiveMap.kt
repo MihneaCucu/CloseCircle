@@ -45,9 +45,9 @@ import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 
-// shortcut: public OpenStreetMap tiles are fine for development; use a hosted tile provider before release
-// (https://operations.osmfoundation.org/policies/tiles/). The visible "© OpenStreetMap" credit is drawn by MapScreen.
-private const val OSM_STYLE = """{"version":8,"sources":{"osm":{"type":"raster","tiles":["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],"tileSize":256,"maxzoom":19,"attribution":"© OpenStreetMap contributors"}},"layers":[{"id":"osm","type":"raster","source":"osm"}]}"""
+// shortcut: OpenFreeMap's hosted "positron" style (light, few labels, OpenStreetMap data, no key) is a development
+// choice; self-host or pick a paid provider before real traffic. The visible credit is drawn by MapScreen.
+private const val MAP_STYLE = "https://tiles.openfreemap.org/styles/positron"
 
 // Romania, shown until someone has a position.
 private val DEFAULT_CAMERA = CameraPosition.Builder().target(LatLng(45.9, 25.0)).zoom(5.0).build()
@@ -131,7 +131,7 @@ fun LiveMap(members: List<Member>, key: String, modifier: Modifier = Modifier) {
                         m.cameraPosition = DEFAULT_CAMERA
                         m.addOnCameraMoveListener { project() }
                         m.addOnCameraIdleListener { project() }
-                        m.setStyle(Style.Builder().fromJson(OSM_STYLE)) { map = m }
+                        m.setStyle(Style.Builder().fromUri(MAP_STYLE)) { map = m }
                     }
                 }
             },
