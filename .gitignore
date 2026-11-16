@@ -11,6 +11,7 @@ local.properties
 **/.gradle/
 **/build/
 *.iml
+.idea/
 
 # Node.js
 **/node_modules/
