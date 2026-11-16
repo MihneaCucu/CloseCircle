@@ -1,14 +1,11 @@
 package com.closecircle.app.data
 
 /**
- * Invitations, zones and zone alerts have no endpoint on `dev` yet (invitations are on
- * feature/SCRUM-12-invite-member; zones and notifications are still proposals, see T-18).
+ * Zones and zone alerts have no endpoint on `dev` yet (they are still proposals, see T-18).
  * The screens read these lists through the view model, so replacing this object with a real
  * repository does not touch the UI.
  */
 object PendingBackendData {
-    fun invites() = listOf(Invite("i1", "Ana", "Vacanța Sinaia", 68))
-
     fun zones() = listOf(
         Zone("acasa", "Acasă", "rază 150 m", true),
         Zone("scoala", "Școala nr. 12", "rază 200 m · alerte pentru Ana", true),

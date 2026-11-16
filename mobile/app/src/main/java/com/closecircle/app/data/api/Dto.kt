@@ -64,3 +64,32 @@ data class LatestLocationDto(val userId: String, val displayName: String, val lo
 
 @Serializable
 data class ProblemDto(val code: String? = null, val title: String? = null, val detail: String? = null)
+
+@Serializable
+data class InviteRequest(val email: String)
+
+/** An invitation as the group's owner or admin sees it. The backend never returns the token. */
+@Serializable
+data class InvitationDto(
+    val invitationId: String,
+    val groupId: String,
+    val email: String,
+    val status: String,
+    val createdAt: String,
+    val expiresAt: String,
+)
+
+@Serializable
+data class InviterDto(val userId: String, val displayName: String)
+
+/** An invitation as the invited person sees it. */
+@Serializable
+data class ReceivedInvitationDto(
+    val invitationId: String,
+    val groupId: String,
+    val groupName: String,
+    val invitedBy: InviterDto,
+    val status: String,
+    val createdAt: String,
+    val expiresAt: String,
+)

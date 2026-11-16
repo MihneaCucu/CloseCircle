@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import com.closecircle.app.data.AlertItem
 import com.closecircle.app.data.AlertKind
 import com.closecircle.app.domain.isDelayed
+import com.closecircle.app.domain.leftText
 import com.closecircle.app.ui.AppViewModel
 import com.closecircle.app.ui.Cap
 import com.closecircle.app.ui.CcCard
@@ -47,7 +48,7 @@ import com.closecircle.app.ui.PillButton
 import com.closecircle.app.ui.UiState
 import com.closecircle.app.ui.theme.Cc
 
-// Invitations and zone alerts are not served by the backend yet; the lists come from PendingBackendData.
+// Invitations come from the backend; zone alerts are not served yet and come from PendingBackendData.
 @Composable
 fun AlertsScreen(ui: UiState, vm: AppViewModel) {
     val c = Cc.colors
@@ -61,10 +62,10 @@ fun AlertsScreen(ui: UiState, vm: AppViewModel) {
             ) {
                 Text("INVITAȚIE NOUĂ", color = c.onDarkAccent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
                 Text("${inv.by} te-a invitat în grupul „${inv.group}”", Modifier.padding(top = 6.dp), color = c.onDark, fontSize = 17.sp, fontWeight = FontWeight.Bold, lineHeight = 22.sp)
-                Text("Expiră în ${inv.expiresInHours} h. Partajarea ta va fi oprită până o activezi.", Modifier.padding(top = 4.dp), color = c.onDarkMuted, fontSize = 13.sp, lineHeight = 18.sp)
+                Text("Expiră în ${leftText(inv.expiresAt - ui.now)}. Partajarea ta va fi oprită până o activezi.", Modifier.padding(top = 4.dp), color = c.onDarkMuted, fontSize = 13.sp, lineHeight = 18.sp)
                 Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    PillButton("Acceptă", { vm.answerInvite(inv.id, true) }, Modifier.weight(1f), container = Color.White, content = Color(0xFF16211F))
-                    PillButton("Refuză", { vm.answerInvite(inv.id, false) }, Modifier.weight(1f), container = Color.Transparent, content = c.onDark, border = BorderStroke(1.dp, Color.White.copy(alpha = 0.45f)))
+                    PillButton("Acceptă", { vm.answerInvite() }, Modifier.weight(1f), container = Color.White, content = Color(0xFF16211F))
+                    PillButton("Refuză", { vm.answerInvite() }, Modifier.weight(1f), container = Color.Transparent, content = c.onDark, border = BorderStroke(1.dp, Color.White.copy(alpha = 0.45f)))
                 }
             }
         }

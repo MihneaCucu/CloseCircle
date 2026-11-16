@@ -14,7 +14,11 @@ data class Group(
     val startedAt: Long,
     val endsAt: Long?,
     val members: Int,
-)
+    /** The caller's role in this group: OWNER, ADMIN or MEMBER. */
+    val role: String? = null,
+) {
+    val canInvite: Boolean get() = role == "OWNER" || role == "ADMIN"
+}
 
 data class Member(
     val id: String,
@@ -27,9 +31,13 @@ data class Member(
     val longitude: Double? = null,
 )
 
-// The types below are not served by the backend yet (no invitation-decline, zone or notification endpoints on dev).
+/** An invitation waiting for the signed-in user. [expiresAt] is epoch milliseconds. */
+data class Invite(val id: String, val by: String, val group: String, val expiresAt: Long)
 
-data class Invite(val id: String, val by: String, val group: String, val expiresInHours: Int)
+/** An invitation the owner or an admin sent from this group. [status] is PENDING, EXPIRED, ACCEPTED or REVOKED. */
+data class SentInvite(val id: String, val email: String, val status: String, val expiresAt: Long)
+
+// The types below are not served by the backend yet (no zone or notification endpoints on dev).
 
 enum class AlertKind { ARRIVE, LEAVE, STOP, EXPIRED }
 

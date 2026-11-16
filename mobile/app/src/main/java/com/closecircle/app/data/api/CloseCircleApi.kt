@@ -18,6 +18,15 @@ interface CloseCircleApi {
 
     /** Other members the caller may see in this group; members who do not share are not listed. */
     suspend fun latestLocations(groupId: String): List<LatestLocationDto>
+
+    /** Owner or admin only. Throws ApiException with code ALREADY_MEMBER or INVITATION_ALREADY_PENDING on a conflict. */
+    suspend fun invite(groupId: String, email: String): InvitationDto
+
+    /** The group's invitations, newest first. Owner or admin only. */
+    suspend fun sentInvitations(groupId: String): List<InvitationDto>
+
+    /** Pending invitations sent to the caller's account email. */
+    suspend fun receivedInvitations(): List<ReceivedInvitationDto>
 }
 
 class HttpCloseCircleApi(private val client: ApiClient) : CloseCircleApi {
@@ -53,4 +62,13 @@ class HttpCloseCircleApi(private val client: ApiClient) : CloseCircleApi {
 
     override suspend fun latestLocations(groupId: String): List<LatestLocationDto> =
         client.send("GET", "/api/v1/groups/$groupId/locations/latest?limit=100") { json.decodeFromString<Page<LatestLocationDto>>(it).items }
+
+    override suspend fun invite(groupId: String, email: String): InvitationDto =
+        client.send("POST", "/api/v1/groups/$groupId/invitations", json.encodeToString(InviteRequest(email))) { json.decodeFromString<InvitationDto>(it) }
+
+    override suspend fun sentInvitations(groupId: String): List<InvitationDto> =
+        client.send("GET", "/api/v1/groups/$groupId/invitations?limit=100") { json.decodeFromString<Page<InvitationDto>>(it).items }
+
+    override suspend fun receivedInvitations(): List<ReceivedInvitationDto> =
+        client.send("GET", "/api/v1/invitations?limit=100") { json.decodeFromString<Page<ReceivedInvitationDto>>(it).items }
 }
