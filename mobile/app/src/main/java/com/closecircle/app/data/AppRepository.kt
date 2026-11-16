@@ -7,11 +7,6 @@ import com.closecircle.app.domain.initialsOf
 import java.time.Instant
 
 private const val MIN_MS = 60_000L
-private const val NEAR_EDGE = 12
-private const val MAP_LEFT = 22
-private const val MAP_RIGHT = 68
-private const val MAP_TOP = 50
-private const val MAP_BOTTOM = 74
 
 /** Reads and changes sharing through the real API and turns the answers into what the screens show. */
 class AppRepository(private val api: CloseCircleApi) {
@@ -37,10 +32,7 @@ class AppRepository(private val api: CloseCircleApi) {
     }
 
     /** Only members who share with you and whom you may see; members who do not share are not returned by the API. */
-    suspend fun members(groupId: String, now: Long): List<Member> {
-        val raw = api.latestLocations(groupId)
-        return layout(raw.map { it.toMember(now) }, raw)
-    }
+    suspend fun members(groupId: String, now: Long): List<Member> = api.latestLocations(groupId).map { it.toMember(now) }
 
     suspend fun createGroup(name: String) {
         api.createGroup(name)
@@ -58,21 +50,9 @@ class AppRepository(private val api: CloseCircleApi) {
         val loc = location
         val minutes = loc?.let { maxOf(0L, (now - Instant.parse(it.recordedAt).toEpochMilli()) / MIN_MS).toInt() }
         val accuracy = loc?.accuracyM?.let { "±${Math.round(it)} m" } ?: "Precizie necunoscută"
-        return Member(userId, displayName, initialsOf(displayName), minutes, if (loc == null) "Nicio actualizare" else accuracy)
-    }
-
-    /** Spreads members over the placeholder map by their coordinates; a single member sits in the middle. */
-    private fun layout(members: List<Member>, raw: List<LatestLocationDto>): List<Member> {
-        val points = raw.mapNotNull { r -> r.location?.let { r.userId to (it.latitude to it.longitude) } }.toMap()
-        if (points.isEmpty()) return members
-        val lats = points.values.map { it.first }
-        val lons = points.values.map { it.second }
-        fun scale(v: Double, lo: Double, hi: Double, from: Int, to: Int): Int =
-            if (hi - lo < 1e-9) (from + to) / 2 else (from + (v - lo) / (hi - lo) * (to - from)).toInt().coerceIn(NEAR_EDGE, 100 - NEAR_EDGE)
-        return members.map { m ->
-            val p = points[m.id] ?: return@map m
-            // north is up: a larger latitude means a smaller y
-            m.copy(x = scale(p.second, lons.min(), lons.max(), MAP_LEFT, MAP_RIGHT), y = scale(p.first, lats.min(), lats.max(), MAP_BOTTOM, MAP_TOP))
-        }
+        return Member(
+            userId, displayName, initialsOf(displayName), minutes, if (loc == null) "Nicio actualizare" else accuracy,
+            latitude = loc?.latitude, longitude = loc?.longitude,
+        )
     }
 }

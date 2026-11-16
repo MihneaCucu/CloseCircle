@@ -70,6 +70,7 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
+    implementation(libs.maplibre)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)

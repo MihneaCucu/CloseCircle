@@ -25,8 +25,11 @@ Debug builds allow plain HTTP only to `10.0.2.2` and `localhost` (`app/src/debug
 | Group list, create a group | `GET /groups`, `POST /groups` |
 | Start sharing, pick a duration, stop sharing | `PUT` / `DELETE /groups/{id}/me/sharing`, `GET /users/me/sharing` |
 | Members, freshness, accuracy, map positions | `GET /groups/{id}/locations/latest` |
+| Map | MapLibre with public OpenStreetMap tiles; the camera fits the members who have a position |
 | "Oprește partajarea în toate grupurile" | one `DELETE` per group that is on (there is no bulk endpoint) |
 | Invitations (Acceptă / Refuză), zones, zone alerts | **local sample data** (`PendingBackendData`): `dev` has no endpoint for them yet |
+
+The map uses OpenStreetMap's public tile server, which is fine for development but not for a release: its [tile usage policy](https://operations.osmfoundation.org/policies/tiles/) asks for a hosted provider in production. The app sends a `User-Agent` of its own and shows the "© OpenStreetMap" credit. The emulator needs internet access to load tiles.
 
 Members who do not share with you are not returned by the API, so they do not appear in the member list. The app does not upload the phone's location yet.
 

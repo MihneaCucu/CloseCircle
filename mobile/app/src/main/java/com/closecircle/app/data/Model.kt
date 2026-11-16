@@ -22,9 +22,9 @@ data class Member(
     val initials: String,
     val minutesAgo: Int?,
     val accuracy: String,
-    /** Position on the placeholder map, in percent; 0 means not on the map. */
-    val x: Int = 0,
-    val y: Int = 0,
+    /** Position of the last point; null when the member has not uploaded one. */
+    val latitude: Double? = null,
+    val longitude: Double? = null,
 )
 
 // The types below are not served by the backend yet (no invitation-decline, zone or notification endpoints on dev).
