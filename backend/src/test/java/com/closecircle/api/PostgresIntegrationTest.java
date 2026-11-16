@@ -64,11 +64,19 @@ public abstract class PostgresIntegrationTest {
 
     /** Registers a new user with a unique email, so tests never collide in the shared database. */
     protected TestUser registerUser(String displayName) throws Exception {
-        String email = displayName.toLowerCase() + "-" + UUID.randomUUID() + "@example.invalid";
+        return registerUser(displayName, uniqueEmail(displayName));
+    }
+
+    protected TestUser registerUser(String displayName, String email) throws Exception {
         JsonNode body = body(postJson("/api/v1/auth/register",
                 Map.of("email", email, "password", "correct-horse-example", "displayName", displayName))
                 .andExpect(status().isCreated()));
         return new TestUser(UUID.fromString(body.at("/user/userId").asText()), email, body.at("/accessToken").asText());
+    }
+
+    /** Unique per call, so tests never collide in the shared database. */
+    protected static String uniqueEmail(String name) {
+        return name.toLowerCase() + "-" + UUID.randomUUID() + "@example.invalid";
     }
 
     protected ResultActions postJson(String path, Object body) throws Exception {
