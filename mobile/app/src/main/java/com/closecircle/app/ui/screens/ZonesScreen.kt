@@ -41,6 +41,7 @@ import com.closecircle.app.data.Zone
 import com.closecircle.app.ui.AppViewModel
 import com.closecircle.app.ui.Cap
 import com.closecircle.app.ui.CcCard
+import com.closecircle.app.ui.GearButton
 import com.closecircle.app.ui.MapCanvas
 import com.closecircle.app.ui.PillButton
 import com.closecircle.app.ui.UiState
@@ -50,8 +51,9 @@ import com.closecircle.app.ui.theme.Cc
 
 // Zones are not served by the backend yet; this screen shows the list the app keeps locally (see PendingBackendData).
 @Composable
-fun ZonesScreen(ui: UiState, vm: AppViewModel) {
+fun ZonesScreen(ui: UiState, vm: AppViewModel, onSettings: () -> Unit) {
     val c = Cc.colors
+    val elder = Cc.elder
     var open by remember { mutableStateOf<String?>("acasa") }
     LazyColumn(Modifier.fillMaxSize().background(c.bg), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 28.dp, bottom = 24.dp)) {
         item {
@@ -60,15 +62,18 @@ fun ZonesScreen(ui: UiState, vm: AppViewModel) {
                     Text("Zone", color = c.text, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 38.sp)
                     Text("${ui.group?.name ?: "Grupul tău"} · ${ui.zones.size} zone", color = c.muted, fontSize = 15.sp, modifier = Modifier.padding(top = 4.dp))
                 }
-                PillButton("+ Zonă nouă", { vm.showMessage("Zonă nouă — disponibil în curând") }, Modifier.widthIn(min = 0.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!elder) PillButton("+ Zonă nouă", { vm.showMessage("Zonă nouă — disponibil în curând") }, Modifier.widthIn(min = 0.dp))
+                    GearButton(onSettings)
+                }
             }
             Spacer(Modifier.height(20.dp))
         }
         items(ui.zones, key = { it.id }) { z ->
-            ZoneCard(z, open == z.id, ui, vm, onToggle = { open = if (open == z.id) null else z.id })
+            ZoneCard(z, open == z.id && !elder, ui, vm, onToggle = { open = if (open == z.id) null else z.id })
             Spacer(Modifier.height(12.dp))
         }
-        item {
+        if (!elder) item {
             Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(Icons.Outlined.Info, null, tint = c.muted, modifier = Modifier.size(18.dp))
                 Text("Sosirea sau plecarea se confirmă după 2 minute în noua zonă. Locațiile cu precizie peste 500 m nu declanșează alerte.", color = c.muted, fontSize = 13.sp, lineHeight = 19.sp)

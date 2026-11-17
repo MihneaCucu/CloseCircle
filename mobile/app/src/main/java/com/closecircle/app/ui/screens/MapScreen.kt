@@ -56,6 +56,7 @@ import com.closecircle.app.data.Member
 import com.closecircle.app.data.SentInvite
 import com.closecircle.app.ui.Cap
 import com.closecircle.app.ui.FreshChip
+import com.closecircle.app.ui.GearButton
 import com.closecircle.app.ui.LiveMap
 import com.closecircle.app.ui.MemberAvatar
 import com.closecircle.app.ui.PillButton
@@ -63,8 +64,9 @@ import com.closecircle.app.ui.UiState
 import com.closecircle.app.ui.theme.Cc
 
 @Composable
-fun MapScreen(ui: UiState, vm: AppViewModel, onManage: () -> Unit) {
+fun MapScreen(ui: UiState, vm: AppViewModel, onManage: () -> Unit, onSettings: () -> Unit) {
     val c = Cc.colors
+    val elder = Cc.elder
     val group = ui.group
     if (group == null) {
         NoGroup(ui.loaded, vm)
@@ -82,7 +84,10 @@ fun MapScreen(ui: UiState, vm: AppViewModel, onManage: () -> Unit) {
                 color = c.muted, fontSize = 10.sp,
             )
             Column(Modifier.statusBarsPadding().padding(16.dp)) {
-                GroupPill(ui, vm)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    GroupPill(ui, vm, Modifier.weight(1f))
+                    GearButton(onSettings)
+                }
                 Spacer(Modifier.height(10.dp))
                 Banner(group, ui.now, onManage)
             }
@@ -96,12 +101,7 @@ fun MapScreen(ui: UiState, vm: AppViewModel, onManage: () -> Unit) {
             Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Membri", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = c.text)
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        if (group.canInvite) {
-                            Text("+ Invită", Modifier.clickable { inviting = true }, color = c.accentFg, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
-                        }
-                        Text("${ui.members.size} din ${(group.members - 1).coerceAtLeast(0)} partajează", fontSize = 12.sp, color = c.muted)
-                    }
+                    if (!elder) Text("${ui.members.size} din ${(group.members - 1).coerceAtLeast(0)} partajează", fontSize = 12.sp, color = c.muted)
                 }
                 if (ui.members.isEmpty()) {
                     Text("Niciun membru nu partajează cu tine în acest grup.", Modifier.padding(top = 16.dp), color = c.muted, fontSize = 14.sp)
@@ -138,11 +138,11 @@ private fun NoGroup(loaded: Boolean, vm: AppViewModel) {
 }
 
 @Composable
-private fun GroupPill(ui: UiState, vm: AppViewModel) {
+private fun GroupPill(ui: UiState, vm: AppViewModel, modifier: Modifier) {
     val c = Cc.colors
     var open by remember { mutableStateOf(false) }
     val group = ui.group ?: return
-    Box {
+    Box(modifier) {
         Surface(
             modifier = Modifier.fillMaxWidth().height(56.dp).clip(CircleShape).clickable { open = true },
             shape = CircleShape, color = c.surface, shadowElevation = 6.dp,
@@ -198,13 +198,14 @@ private fun Banner(group: Group, now: Long, onManage: () -> Unit) {
 @Composable
 private fun MemberRow(m: Member) {
     val c = Cc.colors
+    val elder = Cc.elder
     Row(Modifier.fillMaxWidth().padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         MemberAvatar(m)
         Column(Modifier.weight(1f)) {
             Text(m.name, color = c.text, fontWeight = FontWeight.Bold)
-            Text(m.accuracy, color = c.muted, fontSize = 12.sp, lineHeight = 16.sp)
+            if (elder) FreshChip(m.minutesAgo, Modifier.padding(top = 4.dp)) else Text(m.accuracy, color = c.muted, fontSize = 12.sp, lineHeight = 16.sp)
         }
-        FreshChip(m.minutesAgo, Modifier.widthIn(max = 150.dp))
+        if (!elder) FreshChip(m.minutesAgo, Modifier.widthIn(max = 150.dp))
     }
 }
 

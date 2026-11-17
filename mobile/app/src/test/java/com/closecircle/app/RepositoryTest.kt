@@ -1,8 +1,5 @@
 package com.closecircle.app
 
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.emptyPreferences
 import com.closecircle.app.data.AppRepository
 import com.closecircle.app.data.DataStoreTokenStore
 import com.closecircle.app.data.DurId
@@ -15,8 +12,6 @@ import com.closecircle.app.data.api.LocationDto
 import com.closecircle.app.data.api.ReceivedInvitationDto
 import com.closecircle.app.data.api.SharedGroupDto
 import java.time.Instant
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -140,14 +135,7 @@ class RepositoryTest {
 
     @Test
     fun theDataStoreTokenStoreWritesReadsAndClears() = runBlocking {
-        // an in-memory DataStore: the real file-backed one cannot replace its file on Windows, where developers run these tests
-        val memory = object : DataStore<Preferences> {
-            private val state = MutableStateFlow(emptyPreferences())
-            override val data: Flow<Preferences> = state
-            override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences =
-                transform(state.value).also { state.value = it }
-        }
-        val store = DataStoreTokenStore(memory)
+        val store = DataStoreTokenStore(MemoryDataStore())
         assertNull(store.read())
         store.write("jwt")
         assertEquals("jwt", store.read())

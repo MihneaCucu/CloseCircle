@@ -8,8 +8,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 
 /** Semantic colours from the approved mockups, light and dark. */
 @Immutable
@@ -45,17 +48,33 @@ val DarkCc = CcColors(
     mapBg = Color(0xFF1A2421), road = Color(0xFF27332F), park = Color(0xFF1E2D24),
 )
 
+/** Elderly mode: secondary text, dividers and grey labels use the full text colour; the accent is darker (light) so white text on it has more contrast. */
+fun CcColors.highContrast(dark: Boolean): CcColors = copy(
+    muted = text,
+    line = text,
+    greyFg = text,
+    accent = if (dark) accent else Color(0xFF065F57),
+)
+
+const val ELDER_FONT_SCALE = 1.3f
+
 val LocalCc = staticCompositionLocalOf { LightCc }
+
+/** True when elderly mode is on: screens show only the essential actions. */
+val LocalElder = compositionLocalOf { false }
 
 object Cc {
     val colors: CcColors
         @Composable @ReadOnlyComposable get() = LocalCc.current
+    val elder: Boolean
+        @Composable @ReadOnlyComposable get() = LocalElder.current
 }
 
 @Composable
-fun CloseCircleTheme(content: @Composable () -> Unit) {
+fun CloseCircleTheme(elder: Boolean, content: @Composable () -> Unit) {
     val dark = isSystemInDarkTheme()
-    val cc = if (dark) DarkCc else LightCc
+    val base = if (dark) DarkCc else LightCc
+    val cc = if (elder) base.highContrast(dark) else base
     val scheme = if (dark) {
         darkColorScheme(
             primary = cc.accent, onPrimary = cc.onAccent, background = cc.bg, onBackground = cc.text,
@@ -69,6 +88,11 @@ fun CloseCircleTheme(content: @Composable () -> Unit) {
             error = cc.red, onError = cc.onRed, outline = cc.line,
         )
     }
+    // Larger text comes from the font scale, so it applies to every screen without touching them.
+    val density = LocalDensity.current
+    val scaled = if (elder) Density(density.density, density.fontScale * ELDER_FONT_SCALE) else density
     // shortcut: system font; load Plus Jakarta Sans (as in the mockups) when fonts are bundled
-    CompositionLocalProvider(LocalCc provides cc) { MaterialTheme(colorScheme = scheme, content = content) }
+    CompositionLocalProvider(LocalCc provides cc, LocalElder provides elder, LocalDensity provides scaled) {
+        MaterialTheme(colorScheme = scheme, content = content)
+    }
 }
