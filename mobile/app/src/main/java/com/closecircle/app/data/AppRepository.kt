@@ -16,7 +16,7 @@ class AppRepository(private val api: CloseCircleApi) {
         return api.groups().map { g ->
             val s = shared[g.groupId]
             if (s == null) {
-                Group(g.groupId, g.name, false, DurId.H1, "", now, null, g.memberCount.toInt())
+                Group(g.groupId, g.name, false, DurId.H1, "", now, null, g.memberCount.toInt(), g.myRole)
             } else {
                 // Server-side numbers on both sides: remaining time and total length, so the phone clock only anchors "now".
                 val total = if (s.expiresAt != null && s.updatedAt != null) {
@@ -26,13 +26,25 @@ class AppRepository(private val api: CloseCircleApi) {
                 }
                 val endsAt = s.remainingSeconds?.let { now + it * 1000 }
                 val (durId, label) = durationOf(if (endsAt == null) null else total)
-                Group(g.groupId, g.name, true, durId, label, if (endsAt != null && total != null) endsAt - total else now, endsAt, g.memberCount.toInt())
+                Group(g.groupId, g.name, true, durId, label, if (endsAt != null && total != null) endsAt - total else now, endsAt, g.memberCount.toInt(), g.myRole)
             }
         }
     }
 
     /** Only members who share with you and whom you may see; members who do not share are not returned by the API. */
     suspend fun members(groupId: String, now: Long): List<Member> = api.latestLocations(groupId).map { it.toMember(now) }
+
+    suspend fun receivedInvites(): List<Invite> = api.receivedInvitations().map {
+        Invite(it.invitationId, it.invitedBy.displayName, it.groupName, Instant.parse(it.expiresAt).toEpochMilli())
+    }
+
+    suspend fun sentInvites(groupId: String): List<SentInvite> = api.sentInvitations(groupId).map {
+        SentInvite(it.invitationId, it.email, it.status, Instant.parse(it.expiresAt).toEpochMilli())
+    }
+
+    suspend fun invite(groupId: String, email: String) {
+        api.invite(groupId, email)
+    }
 
     suspend fun createGroup(name: String) {
         api.createGroup(name)

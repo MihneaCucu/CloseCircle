@@ -13,6 +13,7 @@ import com.closecircle.app.data.Group
 import com.closecircle.app.data.Invite
 import com.closecircle.app.data.Member
 import com.closecircle.app.data.PendingBackendData
+import com.closecircle.app.data.SentInvite
 import com.closecircle.app.data.Session
 import com.closecircle.app.data.Zone
 import com.closecircle.app.data.api.ApiException
@@ -29,6 +30,7 @@ private const val POLL_MS = 30_000L
 private const val MAX_CUSTOM_MIN = 7 * 24 * 60 // the backend accepts 1 minute to 7 days
 const val MIN_CUSTOM_MIN = 5
 const val MIN_PASSWORD_CHARS = 12 // backend rule, checked here to save a round trip
+private val EMAIL = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$") // light check; the backend validates the address for real
 
 sealed interface Auth {
     data object Checking : Auth
@@ -46,6 +48,8 @@ data class UiState(
     val now: Long = 0,
     val toast: String? = null,
     val invites: List<Invite> = emptyList(),
+    /** Invitations sent from the selected group; only loaded for its owner or admins. */
+    val sent: List<SentInvite> = emptyList(),
     val alerts: List<AlertItem> = emptyList(),
     val zones: List<Zone> = emptyList(),
     val zoneNotify: Set<String> = setOf("acasa-ana-in", "acasa-ana-out", "acasa-mihai-in", "scoala-ana-in", "scoala-ana-out"),
@@ -61,7 +65,7 @@ class AppViewModel(
     pollMs: Long? = POLL_MS,
 ) : ViewModel() {
     private val _ui = MutableStateFlow(
-        UiState(now = clock(), invites = PendingBackendData.invites(), alerts = PendingBackendData.alerts(), zones = PendingBackendData.zones()),
+        UiState(now = clock(), alerts = PendingBackendData.alerts(), zones = PendingBackendData.zones()),
     )
     val ui: StateFlow<UiState> = _ui.asStateFlow()
 
@@ -116,7 +120,7 @@ class AppViewModel(
     fun signOut(message: String? = null) {
         viewModelScope.launch {
             session.signOut()
-            _ui.update { UiState(auth = Auth.SignedOut(error = message), now = clock(), invites = PendingBackendData.invites(), alerts = PendingBackendData.alerts(), zones = PendingBackendData.zones()) }
+            _ui.update { UiState(auth = Auth.SignedOut(error = message), now = clock(), alerts = PendingBackendData.alerts(), zones = PendingBackendData.zones()) }
         }
     }
 
@@ -135,11 +139,25 @@ class AppViewModel(
             _ui.update { it.copy(groups = groups, groupId = id, members = members, now = now, loaded = true) }
         } catch (e: ApiException) {
             handle(e)
+            return
+        }
+        refreshInvites()
+    }
+
+    /** Separate from the main refresh: a server that has no invitation routes yet must not break groups and members. */
+    private suspend fun refreshInvites() {
+        try {
+            val invites = repo.receivedInvites()
+            val group = _ui.value.group
+            val sent = if (group != null && group.canInvite) repo.sentInvites(group.id) else emptyList()
+            _ui.update { it.copy(invites = invites, sent = sent) }
+        } catch (e: ApiException) {
+            if (e.unauthorized) handle(e) // anything else keeps the lists as they were
         }
     }
 
     fun selectGroup(id: String) {
-        _ui.update { it.copy(groupId = id, members = emptyList()) }
+        _ui.update { it.copy(groupId = id, members = emptyList(), sent = emptyList()) }
         refresh()
     }
 
@@ -187,12 +205,18 @@ class AppViewModel(
         return null
     }
 
+    /** Returns an error message, or null when the invitation was sent. Owner or admin only; the backend enforces it. */
+    fun invite(g: Group, raw: String): String? {
+        val email = raw.trim()
+        if (!EMAIL.matches(email)) return "Scrie o adresă de email validă."
+        act("Invitație trimisă către $email") { repo.invite(g.id, email) }
+        return null
+    }
+
     // not backed by the server yet
 
-    fun answerInvite(id: String, accept: Boolean) {
-        _ui.update { it.copy(invites = it.invites.filterNot { inv -> inv.id == id }) }
-        toast(if (accept) "Invitație acceptată · partajarea rămâne oprită" else "Invitație refuzată")
-    }
+    // shortcut: accepting or declining has no endpoint on dev yet (SCRUM-13); call it here once it lands.
+    fun answerInvite() = toast("Acceptarea și refuzul invitațiilor vor fi disponibile în curând.")
 
     fun toggleZoneNotify(key: String) =
         _ui.update { it.copy(zoneNotify = if (key in it.zoneNotify) it.zoneNotify - key else it.zoneNotify + key) }
@@ -210,6 +234,8 @@ class AppViewModel(
     companion object {
         fun message(e: ApiException): String = when {
             e.unreachable -> "Nu mă pot conecta la server."
+            e.code == "ALREADY_MEMBER" -> "Persoana e deja membră a grupului."
+            e.code == "INVITATION_ALREADY_PENDING" -> "Are deja o invitație în așteptare."
             e.status == 400 -> "Datele trimise nu sunt valide."
             e.status == 403 -> "Nu ai voie să faci asta."
             e.status == 404 -> "Grupul nu mai există sau nu mai ești membru."

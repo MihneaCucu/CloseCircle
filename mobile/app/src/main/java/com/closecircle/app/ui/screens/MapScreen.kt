@@ -18,18 +18,21 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -49,6 +53,8 @@ import com.closecircle.app.domain.leftText
 import com.closecircle.app.ui.AppViewModel
 import com.closecircle.app.ui.Dot
 import com.closecircle.app.data.Member
+import com.closecircle.app.data.SentInvite
+import com.closecircle.app.ui.Cap
 import com.closecircle.app.ui.FreshChip
 import com.closecircle.app.ui.LiveMap
 import com.closecircle.app.ui.MemberAvatar
@@ -64,6 +70,8 @@ fun MapScreen(ui: UiState, vm: AppViewModel, onManage: () -> Unit) {
         NoGroup(ui.loaded, vm)
         return
     }
+    var inviting by remember { mutableStateOf(false) }
+    if (inviting) InviteDialog(group, vm) { inviting = false }
     BoxWithConstraints(Modifier.fillMaxSize().background(c.bg)) {
         val mapHeight = maxHeight * 0.50f
         Box(Modifier.fillMaxWidth().height(mapHeight)) {
@@ -88,12 +96,23 @@ fun MapScreen(ui: UiState, vm: AppViewModel, onManage: () -> Unit) {
             Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Membri", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = c.text)
-                    Text("${ui.members.size} din ${(group.members - 1).coerceAtLeast(0)} partajează", fontSize = 12.sp, color = c.muted)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        if (group.canInvite) {
+                            Text("+ Invită", Modifier.clickable { inviting = true }, color = c.accentFg, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
+                        }
+                        Text("${ui.members.size} din ${(group.members - 1).coerceAtLeast(0)} partajează", fontSize = 12.sp, color = c.muted)
+                    }
                 }
                 if (ui.members.isEmpty()) {
                     Text("Niciun membru nu partajează cu tine în acest grup.", Modifier.padding(top = 16.dp), color = c.muted, fontSize = 14.sp)
                 }
-                LazyColumn { items(ui.members, key = { it.id }) { MemberRow(it) } }
+                LazyColumn {
+                    items(ui.members, key = { it.id }) { MemberRow(it) }
+                    if (ui.sent.isNotEmpty()) {
+                        item { Cap("INVITAȚII TRIMISE", Modifier.padding(top = 12.dp, bottom = 4.dp)) }
+                        items(ui.sent, key = { it.id }) { SentRow(it, ui.now) }
+                    }
+                }
             }
         }
     }
@@ -111,7 +130,7 @@ private fun NoGroup(loaded: Boolean, vm: AppViewModel) {
             return
         }
         Text("Nu ești încă într-un grup", color = c.text, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
-        Text("Creează un grup privat pentru familia ta. Invitațiile pentru ceilalți membri vin într-o etapă următoare.", Modifier.padding(top = 8.dp, bottom = 16.dp), color = c.muted, fontSize = 14.sp)
+        Text("Creează un grup privat pentru familia ta. După aceea îți poți invita membrii cu emailul lor.", Modifier.padding(top = 8.dp, bottom = 16.dp), color = c.muted, fontSize = 14.sp)
         OutlinedTextField(name, { name = it.take(100); error = null }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Numele grupului") }, isError = error != null)
         error?.let { Text(it, Modifier.padding(top = 4.dp), color = c.red, fontSize = 12.sp) }
         PillButton("Creează grupul", { error = vm.createGroup(name) }, Modifier.padding(top = 16.dp).fillMaxWidth())
@@ -187,4 +206,47 @@ private fun MemberRow(m: Member) {
         }
         FreshChip(m.minutesAgo, Modifier.widthIn(max = 150.dp))
     }
+}
+
+@Composable
+private fun SentRow(inv: SentInvite, now: Long) {
+    val c = Cc.colors
+    val status = when (inv.status) {
+        "PENDING" -> "În așteptare · expiră în ${leftText(inv.expiresAt - now)}"
+        "EXPIRED" -> "Expirată"
+        "ACCEPTED" -> "Acceptată"
+        else -> "Anulată"
+    }
+    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(inv.email, Modifier.weight(1f), color = c.text, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(status, color = c.muted, fontSize = 12.sp)
+    }
+}
+
+/** Owner or admin invites someone by email. The server's answer (already a member, already invited) comes back as a message. */
+@Composable
+private fun InviteDialog(group: Group, vm: AppViewModel, onDismiss: () -> Unit) {
+    val c = Cc.colors
+    var email by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Invită în ${group.name}") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    email, { email = it.take(320); error = null }, Modifier.fillMaxWidth(), singleLine = true,
+                    label = { Text("Email") }, isError = error != null, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                )
+                error?.let { Text(it, Modifier.padding(top = 4.dp), color = c.red, fontSize = 12.sp) }
+            }
+        },
+        confirmButton = {
+            TextButton({
+                error = vm.invite(group, email)
+                if (error == null) onDismiss()
+            }) { Text("Trimite") }
+        },
+        dismissButton = { TextButton(onDismiss) { Text("Anulează") } },
+    )
 }

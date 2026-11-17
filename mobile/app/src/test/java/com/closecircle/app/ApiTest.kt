@@ -158,4 +158,34 @@ class ApiTest {
             assertEquals("NETWORK", e.code)
         }
     }
+
+    @Test
+    fun invitationsUseTheRoutesAndShapesOfTheBackend() = runBlocking {
+        val sent = """{"invitationId":"i1","groupId":"g1","email":"a@b.ro","status":"PENDING","createdAt":"2026-11-16T09:00:00Z","expiresAt":"2026-11-23T09:00:00Z"}"""
+        val received = """{"invitationId":"i2","groupId":"g9","groupName":"Sinaia","invitedBy":{"userId":"u2","displayName":"Ana"},"status":"PENDING","createdAt":"2026-11-16T09:00:00Z","expiresAt":"2026-11-23T09:00:00Z"}"""
+        server.enqueue(json(sent, 201))
+        server.enqueue(json("""{"items":[$sent],"nextCursor":null}"""))
+        server.enqueue(json("""{"items":[$received],"nextCursor":null}"""))
+        assertEquals("PENDING", api.invite("g1", "a@b.ro").status)
+        val post = server.takeRequest()
+        assertEquals("POST", post.method)
+        assertEquals("/api/v1/groups/g1/invitations", post.path)
+        assertTrue(post.body.readUtf8().contains("""email":"a@b.ro"""))
+        assertEquals("a@b.ro", api.sentInvitations("g1").single().email)
+        assertEquals("/api/v1/groups/g1/invitations?limit=100", server.takeRequest().path)
+        assertEquals("Ana", api.receivedInvitations().single().invitedBy.displayName)
+        assertEquals("/api/v1/invitations?limit=100", server.takeRequest().path)
+    }
+
+    @Test
+    fun anInvitationConflictKeepsItsCode() = runBlocking {
+        server.enqueue(json("""{"code":"ALREADY_MEMBER","title":"Already a member","status":409}""", 409))
+        try {
+            api.invite("g1", "a@b.ro")
+            fail("expected a conflict")
+        } catch (e: ApiException) {
+            assertEquals(409, e.status)
+            assertEquals("ALREADY_MEMBER", e.code)
+        }
+    }
 }
