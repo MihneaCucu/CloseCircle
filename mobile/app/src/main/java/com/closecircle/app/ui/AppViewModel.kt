@@ -125,7 +125,7 @@ class AppViewModel(
     fun signOut(message: String? = null) {
         viewModelScope.launch {
             session.signOut()
-            _ui.update { UiState(auth = Auth.SignedOut(error = message), elder = it.elder, now = clock(), invites = PendingBackendData.invites(), alerts = PendingBackendData.alerts(), zones = PendingBackendData.zones()) }
+            _ui.update { UiState(auth = Auth.SignedOut(error = message), elder = it.elder, now = clock(), alerts = PendingBackendData.alerts(), zones = PendingBackendData.zones()) }
         }
     }
 
