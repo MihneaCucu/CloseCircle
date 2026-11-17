@@ -5,8 +5,11 @@ import com.closecircle.app.data.DataStoreTokenStore
 import com.closecircle.app.data.DurId
 import com.closecircle.app.data.Session
 import com.closecircle.app.data.api.GroupDto
+import com.closecircle.app.data.api.InvitationDto
+import com.closecircle.app.data.api.InviterDto
 import com.closecircle.app.data.api.LatestLocationDto
 import com.closecircle.app.data.api.LocationDto
+import com.closecircle.app.data.api.ReceivedInvitationDto
 import com.closecircle.app.data.api.SharedGroupDto
 import java.time.Instant
 import kotlinx.coroutines.runBlocking
@@ -138,5 +141,27 @@ class RepositoryTest {
         assertEquals("jwt", store.read())
         store.write(null)
         assertNull(store.read())
+    }
+
+    @Test
+    fun groupsKeepTheCallersRoleSoTheAppKnowsWhoMayInvite() = runBlocking {
+        api.groups = mutableListOf(GroupDto("g1", "A", 2, "OWNER"), GroupDto("g2", "B", 2, "ADMIN"), GroupDto("g3", "C", 2, "MEMBER"))
+        val roles = repo.groups(NOW).associate { it.id to it.canInvite }
+        assertEquals(mapOf("g1" to true, "g2" to true, "g3" to false), roles)
+    }
+
+    @Test
+    fun invitationsAreMappedToWhatTheScreensShow() = runBlocking {
+        api.received = mutableListOf(ReceivedInvitationDto("i1", "g9", "Sinaia", InviterDto("u2", "Ana"), "PENDING", "2026-11-16T09:00:00Z", "2026-11-23T09:00:00Z"))
+        api.sent["g1"] = listOf(InvitationDto("s1", "g1", "tudor@b.ro", "EXPIRED", "2026-11-01T09:00:00Z", "2026-11-08T09:00:00Z"))
+        val received = repo.receivedInvites().single()
+        assertEquals("Ana", received.by)
+        assertEquals("Sinaia", received.group)
+        assertEquals(Instant.parse("2026-11-23T09:00:00Z").toEpochMilli(), received.expiresAt)
+        val sent = repo.sentInvites("g1").single()
+        assertEquals("tudor@b.ro", sent.email)
+        assertEquals("EXPIRED", sent.status)
+        repo.invite("g1", "elena@b.ro")
+        assertTrue(api.calls.contains("invite g1 elena@b.ro"))
     }
 }

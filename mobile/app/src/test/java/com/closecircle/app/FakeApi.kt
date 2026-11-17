@@ -8,7 +8,9 @@ import com.closecircle.app.data.api.ApiException
 import com.closecircle.app.data.api.AuthResponse
 import com.closecircle.app.data.api.CloseCircleApi
 import com.closecircle.app.data.api.GroupDto
+import com.closecircle.app.data.api.InvitationDto
 import com.closecircle.app.data.api.LatestLocationDto
+import com.closecircle.app.data.api.ReceivedInvitationDto
 import com.closecircle.app.data.api.SharedGroupDto
 import com.closecircle.app.data.api.SharingDto
 import com.closecircle.app.data.api.UserDto
@@ -36,7 +38,12 @@ class FakeApi : CloseCircleApi {
     var groups = mutableListOf<GroupDto>()
     var shared = mutableListOf<SharedGroupDto>()
     var latest = mutableMapOf<String, List<LatestLocationDto>>()
+    var received = mutableListOf<ReceivedInvitationDto>()
+    var sent = mutableMapOf<String, List<InvitationDto>>()
     var failNext: ApiException? = null
+
+    /** Fails only the invitation list, to prove a server without invitation routes does not break the rest. */
+    var failReceived: ApiException? = null
 
     private fun call(name: String) {
         calls += name
@@ -90,5 +97,23 @@ class FakeApi : CloseCircleApi {
     override suspend fun latestLocations(groupId: String): List<LatestLocationDto> {
         call("latest $groupId")
         return latest[groupId].orEmpty()
+    }
+
+    override suspend fun invite(groupId: String, email: String): InvitationDto {
+        call("invite $groupId $email")
+        val inv = InvitationDto("i-${sent.values.sumOf { it.size } + 1}", groupId, email, "PENDING", "2026-11-16T09:00:00Z", "2026-11-23T09:00:00Z")
+        sent[groupId] = sent[groupId].orEmpty() + inv
+        return inv
+    }
+
+    override suspend fun sentInvitations(groupId: String): List<InvitationDto> {
+        call("sent $groupId")
+        return sent[groupId].orEmpty()
+    }
+
+    override suspend fun receivedInvitations(): List<ReceivedInvitationDto> {
+        call("received")
+        failReceived?.let { throw it }
+        return received.toList()
     }
 }

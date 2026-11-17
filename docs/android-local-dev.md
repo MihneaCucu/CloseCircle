@@ -27,7 +27,9 @@ Debug builds allow plain HTTP only to `10.0.2.2` and `localhost` (`app/src/debug
 | Members, freshness, accuracy, map positions | `GET /groups/{id}/locations/latest` |
 | Map | MapLibre with the light "positron" style from OpenFreeMap (OpenStreetMap data); the camera fits the members who have a position |
 | "Oprește partajarea în toate grupurile" | one `DELETE` per group that is on (there is no bulk endpoint) |
-| Invitations (Acceptă / Refuză), zones, zone alerts | **local sample data** (`PendingBackendData`): `dev` has no endpoint for them yet |
+| Invite by email (owner and admin only), invitations you sent, invitations waiting for you | `POST` / `GET /groups/{id}/invitations`, `GET /invitations` |
+| Invitations: Acceptă / Refuză | the buttons only show a message: there is no accept or decline endpoint yet (SCRUM-13) |
+| Zones, zone alerts | **local sample data** (`PendingBackendData`): `dev` has no endpoint for them yet |
 
 The map style and tiles come from OpenFreeMap's public server (free, no key). That suits development; before real traffic, self-host the tiles or pick a paid provider (see the `shortcut:` note in `LiveMap.kt`). The app sends a `User-Agent` of its own and shows the "© OpenFreeMap · © OpenStreetMap" credit. The emulator needs internet access to load the map.
 
@@ -35,7 +37,7 @@ Members who do not share with you are not returned by the API, so they do not ap
 
 ## Seeding a second member for a manual check
 
-There is no invitation endpoint on `dev` yet, so add members to a group directly in the local database. This is for local testing only.
+You can invite someone from the app (the "+ Invită" link above the member list), but accepting is not possible yet (SCRUM-13). Until then, add members to a group directly in the local database. This is for local testing only.
 
 ```sh
 docker exec infra-postgres-1 psql -U closecircle -d closecircle -c \

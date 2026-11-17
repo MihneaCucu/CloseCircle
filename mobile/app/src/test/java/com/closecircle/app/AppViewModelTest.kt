@@ -6,8 +6,11 @@ import com.closecircle.app.data.Session
 import com.closecircle.app.data.UserPrefs
 import com.closecircle.app.data.api.ApiException
 import com.closecircle.app.data.api.GroupDto
+import com.closecircle.app.data.api.InvitationDto
+import com.closecircle.app.data.api.InviterDto
 import com.closecircle.app.data.api.LatestLocationDto
 import com.closecircle.app.data.api.LocationDto
+import com.closecircle.app.data.api.ReceivedInvitationDto
 import com.closecircle.app.data.api.SharedGroupDto
 import com.closecircle.app.ui.Auth
 import com.closecircle.app.ui.AppViewModel
@@ -60,7 +63,6 @@ class AppViewModelTest {
         assertEquals(listOf("Familia", "Bunicii"), v.ui.value.groups.map { it.name })
         assertEquals("g1", v.ui.value.groupId)
         assertTrue(v.ui.value.loaded)
-        assertTrue(v.ui.value.invites.isNotEmpty()) // pending-backend data is available
     }
 
     @Test
@@ -213,16 +215,77 @@ class AppViewModelTest {
         assertTrue(v.ui.value.groups.any { it.name == "Prieteni" })
     }
 
+    private fun received(id: String = "i1") =
+        ReceivedInvitationDto(id, "g9", "Vacanța", InviterDto("u2", "Ana"), "PENDING", "2026-11-16T09:00:00Z", "2026-11-23T09:00:00Z")
+
+    private fun sentInvite(id: String, email: String, status: String = "PENDING") =
+        InvitationDto(id, "g1", email, status, "2026-11-16T09:00:00Z", "2026-11-23T09:00:00Z")
+
     @Test
-    fun invitationsLeaveTheListWhenAnswered() {
+    fun receivedInvitationsComeFromTheServer() {
+        api.received = mutableListOf(received())
         val v = signedIn()
-        val id = v.ui.value.invites.first().id
-        v.answerInvite(id, true)
+        val inv = v.ui.value.invites.single()
+        assertEquals("Ana", inv.by)
+        assertEquals("Vacanța", inv.group)
+        assertEquals(java.time.Instant.parse("2026-11-23T09:00:00Z").toEpochMilli(), inv.expiresAt)
+    }
+
+    @Test
+    fun answeringAnInvitationSaysItIsNotAvailableYet() {
+        api.received = mutableListOf(received())
+        val v = signedIn()
+        v.answerInvite()
+        assertEquals("Acceptarea și refuzul invitațiilor vor fi disponibile în curând.", v.ui.value.toast)
+        assertEquals(1, v.ui.value.invites.size) // nothing was sent, so the invitation stays
+    }
+
+    @Test
+    fun anOwnerSeesTheSentInvitationsAndAMemberDoesNot() {
+        api.sent["g1"] = listOf(sentInvite("s1", "tudor@b.ro"), sentInvite("s2", "elena@b.ro", "EXPIRED"))
+        val v = signedIn() // g1: OWNER
+        assertEquals(listOf("tudor@b.ro", "elena@b.ro"), v.ui.value.sent.map { it.email })
+        v.selectGroup("g2") // MEMBER
+        assertTrue(v.ui.value.sent.isEmpty())
+        assertTrue(api.calls.none { it == "sent g2" })
+    }
+
+    @Test
+    fun inviteChecksTheEmailThenSendsAndRefreshes() {
+        val v = signedIn()
+        val g = v.ui.value.group!!
+        assertEquals("Scrie o adresă de email validă.", v.invite(g, "nu-e-email"))
+        assertEquals("Scrie o adresă de email validă.", v.invite(g, "  "))
+        assertTrue(api.calls.none { it.startsWith("invite") })
+        assertNull(v.invite(g, "  tudor@b.ro "))
+        assertTrue(api.calls.contains("invite g1 tudor@b.ro")) // trimmed before it is sent
+        assertEquals("Invitație trimisă către tudor@b.ro", v.ui.value.toast)
+        assertEquals(listOf("tudor@b.ro"), v.ui.value.sent.map { it.email })
+    }
+
+    @Test
+    fun inviteConflictsGetTheirOwnMessages() {
+        val v = signedIn()
+        val g = v.ui.value.group!!
+        api.failNext = ApiException(409, "ALREADY_MEMBER")
+        v.invite(g, "a@b.ro")
+        assertEquals("Persoana e deja membră a grupului.", v.ui.value.toast)
+        api.failNext = ApiException(409, "INVITATION_ALREADY_PENDING")
+        v.invite(g, "a@b.ro")
+        assertEquals("Are deja o invitație în așteptare.", v.ui.value.toast)
+    }
+
+    @Test
+    fun aServerWithoutInvitationRoutesDoesNotBreakTheGroups() {
+        api.failReceived = ApiException(404, "NOT_FOUND")
+        val v = signedIn()
+        assertEquals(Auth.SignedIn, v.ui.value.auth)
+        assertEquals(2, v.ui.value.groups.size)
         assertTrue(v.ui.value.invites.isEmpty())
-        assertEquals("Invitație acceptată · partajarea rămâne oprită", v.ui.value.toast)
-        val w = signedIn()
-        w.answerInvite(w.ui.value.invites.first().id, false)
-        assertEquals("Invitație refuzată", w.ui.value.toast)
+        assertNull(v.ui.value.toast)
+        api.failReceived = ApiException(401, null)
+        v.refresh()
+        assertTrue(v.ui.value.auth is Auth.SignedOut) // an expired token is still caught here
     }
 
     @Test
