@@ -1,0 +1,106 @@
+package com.closecircle.app
+
+import com.closecircle.app.data.TokenStore
+import com.closecircle.app.data.api.ApiException
+import com.closecircle.app.data.api.AuthResponse
+import com.closecircle.app.data.api.CloseCircleApi
+import com.closecircle.app.data.api.GroupDto
+import com.closecircle.app.data.api.InvitationDto
+import com.closecircle.app.data.api.LatestLocationDto
+import com.closecircle.app.data.api.ReceivedInvitationDto
+import com.closecircle.app.data.api.SharedGroupDto
+import com.closecircle.app.data.api.SharingDto
+import com.closecircle.app.data.api.UserDto
+
+class MemoryTokenStore(var token: String? = null) : TokenStore {
+    override suspend fun read() = token
+    override suspend fun write(token: String?) {
+        this.token = token
+    }
+}
+
+/** An in-memory backend: records every call and can be told to fail the next one. */
+class FakeApi : CloseCircleApi {
+    val calls = mutableListOf<String>()
+    var groups = mutableListOf<GroupDto>()
+    var shared = mutableListOf<SharedGroupDto>()
+    var latest = mutableMapOf<String, List<LatestLocationDto>>()
+    var received = mutableListOf<ReceivedInvitationDto>()
+    var sent = mutableMapOf<String, List<InvitationDto>>()
+    var failNext: ApiException? = null
+
+    /** Fails only the invitation list, to prove a server without invitation routes does not break the rest. */
+    var failReceived: ApiException? = null
+
+    private fun call(name: String) {
+        calls += name
+        failNext?.let {
+            failNext = null
+            throw it
+        }
+    }
+
+    private fun auth(email: String, name: String) = AuthResponse("token-$email", "2026-11-16T22:00:00Z", UserDto("u1", email, name))
+
+    override suspend fun register(email: String, password: String, displayName: String): AuthResponse {
+        call("register $email")
+        return auth(email, displayName)
+    }
+
+    override suspend fun login(email: String, password: String): AuthResponse {
+        call("login $email")
+        return auth(email, "Ana")
+    }
+
+    override suspend fun groups(): List<GroupDto> {
+        call("groups")
+        return groups.toList()
+    }
+
+    override suspend fun createGroup(name: String): GroupDto {
+        call("createGroup $name")
+        return GroupDto("g-${groups.size + 1}", name, 1, "OWNER").also { groups += it }
+    }
+
+    override suspend fun mySharing(): List<SharedGroupDto> {
+        call("mySharing")
+        return shared.toList()
+    }
+
+    override suspend fun startSharing(groupId: String, durationMinutes: Int?): SharingDto {
+        call("start $groupId $durationMinutes")
+        val g = groups.first { it.groupId == groupId }
+        shared.removeAll { it.groupId == groupId }
+        shared += SharedGroupDto(groupId, g.name, null, null, null)
+        return SharingDto(groupId, true, true)
+    }
+
+    override suspend fun stopSharing(groupId: String): SharingDto {
+        call("stop $groupId")
+        shared.removeAll { it.groupId == groupId }
+        return SharingDto(groupId, false, false)
+    }
+
+    override suspend fun latestLocations(groupId: String): List<LatestLocationDto> {
+        call("latest $groupId")
+        return latest[groupId].orEmpty()
+    }
+
+    override suspend fun invite(groupId: String, email: String): InvitationDto {
+        call("invite $groupId $email")
+        val inv = InvitationDto("i-${sent.values.sumOf { it.size } + 1}", groupId, email, "PENDING", "2026-11-16T09:00:00Z", "2026-11-23T09:00:00Z")
+        sent[groupId] = sent[groupId].orEmpty() + inv
+        return inv
+    }
+
+    override suspend fun sentInvitations(groupId: String): List<InvitationDto> {
+        call("sent $groupId")
+        return sent[groupId].orEmpty()
+    }
+
+    override suspend fun receivedInvitations(): List<ReceivedInvitationDto> {
+        call("received")
+        failReceived?.let { throw it }
+        return received.toList()
+    }
+}
