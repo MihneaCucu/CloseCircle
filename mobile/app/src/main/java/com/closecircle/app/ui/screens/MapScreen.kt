@@ -101,7 +101,13 @@ fun MapScreen(ui: UiState, vm: AppViewModel, onManage: () -> Unit, onSettings: (
             Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceBetween) {
                     Text("Membri", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = c.text)
-                    if (!elder) Text("${ui.members.size} din ${(group.members - 1).coerceAtLeast(0)} partajează", fontSize = 12.sp, color = c.muted)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        // Editing actions are hidden in elder mode, like "Zonă nouă".
+                        if (group.canInvite && !elder) {
+                            Text("+ Invită", Modifier.clickable { inviting = true }, color = c.accentFg, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
+                        }
+                        if (!elder) Text("${ui.members.size} din ${(group.members - 1).coerceAtLeast(0)} partajează", fontSize = 12.sp, color = c.muted)
+                    }
                 }
                 if (ui.members.isEmpty()) {
                     Text("Niciun membru nu partajează cu tine în acest grup.", Modifier.padding(top = 16.dp), color = c.muted, fontSize = 14.sp)
