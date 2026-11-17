@@ -15,6 +15,7 @@ import com.closecircle.app.data.Member
 import com.closecircle.app.data.PendingBackendData
 import com.closecircle.app.data.SentInvite
 import com.closecircle.app.data.Session
+import com.closecircle.app.data.UserPrefs
 import com.closecircle.app.data.Zone
 import com.closecircle.app.data.api.ApiException
 import com.closecircle.app.data.api.CloseCircleApi
@@ -45,6 +46,8 @@ data class UiState(
     val groupId: String? = null,
     /** True once the first answer from the server arrived, so an empty list means "no groups", not "still loading". */
     val loaded: Boolean = false,
+    /** Elderly mode: large text, high contrast, big buttons and only the essential actions. */
+    val elder: Boolean = false,
     val now: Long = 0,
     val toast: String? = null,
     val invites: List<Invite> = emptyList(),
@@ -61,6 +64,7 @@ class AppViewModel(
     private val api: CloseCircleApi,
     private val repo: AppRepository,
     private val session: Session,
+    private val prefs: UserPrefs,
     private val clock: () -> Long = System::currentTimeMillis,
     pollMs: Long? = POLL_MS,
 ) : ViewModel() {
@@ -70,6 +74,7 @@ class AppViewModel(
     val ui: StateFlow<UiState> = _ui.asStateFlow()
 
     init {
+        viewModelScope.launch { prefs.elder.collect { on -> _ui.update { it.copy(elder = on) } } }
         viewModelScope.launch {
             session.load()
             if (session.token != null) {
@@ -120,7 +125,7 @@ class AppViewModel(
     fun signOut(message: String? = null) {
         viewModelScope.launch {
             session.signOut()
-            _ui.update { UiState(auth = Auth.SignedOut(error = message), now = clock(), alerts = PendingBackendData.alerts(), zones = PendingBackendData.zones()) }
+            _ui.update { UiState(auth = Auth.SignedOut(error = message), elder = it.elder, now = clock(), invites = PendingBackendData.invites(), alerts = PendingBackendData.alerts(), zones = PendingBackendData.zones()) }
         }
     }
 
@@ -221,6 +226,13 @@ class AppViewModel(
     fun toggleZoneNotify(key: String) =
         _ui.update { it.copy(zoneNotify = if (key in it.zoneNotify) it.zoneNotify - key else it.zoneNotify + key) }
 
+    // settings
+
+    fun setElder(on: Boolean) {
+        viewModelScope.launch { prefs.setElder(on) }
+        toast(if (on) "Mod pentru persoane în vârstă activat" else "Interfața standard a fost restabilită")
+    }
+
     // messages
 
     fun showMessage(msg: String) = toast(msg)
@@ -254,7 +266,7 @@ class AppViewModel(
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val app = this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as CloseCircleApp
-                AppViewModel(app.api, app.repository, app.session)
+                AppViewModel(app.api, app.repository, app.session, app.prefs)
             }
         }
     }

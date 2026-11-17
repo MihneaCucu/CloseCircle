@@ -33,6 +33,7 @@ import androidx.navigation.compose.rememberNavController
 import com.closecircle.app.ui.screens.AlertsScreen
 import com.closecircle.app.ui.screens.LoginScreen
 import com.closecircle.app.ui.screens.MapScreen
+import com.closecircle.app.ui.screens.SettingsScreen
 import com.closecircle.app.ui.screens.ShareScreen
 import com.closecircle.app.ui.screens.ZonesScreen
 import com.closecircle.app.ui.theme.Cc
@@ -40,6 +41,8 @@ import com.closecircle.app.ui.theme.Cc
 private enum class Dest(val route: String, val label: String) {
     MAP("map", "Hartă"), SHARE("share", "Partajare"), ZONES("zones", "Zone"), ALERTS("alerts", "Alerte")
 }
+
+private const val SETTINGS = "settings"
 
 @Composable
 fun AppRoot(vm: AppViewModel) {
@@ -104,11 +107,13 @@ private fun Main(ui: UiState, vm: AppViewModel) {
         },
     ) { inner ->
         Box(Modifier.padding(bottom = inner.calculateBottomPadding())) {
+            val openSettings = { nav.navigate(SETTINGS) { launchSingleTop = true } }
             NavHost(nav, startDestination = Dest.MAP.route) {
-                composable(Dest.MAP.route) { MapScreen(ui, vm, onManage = { go(Dest.SHARE.route) }) }
-                composable(Dest.SHARE.route) { ShareScreen(ui, vm) }
-                composable(Dest.ZONES.route) { ZonesScreen(ui, vm) }
-                composable(Dest.ALERTS.route) { AlertsScreen(ui, vm) }
+                composable(Dest.MAP.route) { MapScreen(ui, vm, onManage = { go(Dest.SHARE.route) }, onSettings = openSettings) }
+                composable(Dest.SHARE.route) { ShareScreen(ui, vm, openSettings) }
+                composable(Dest.ZONES.route) { ZonesScreen(ui, vm, openSettings) }
+                composable(Dest.ALERTS.route) { AlertsScreen(ui, vm, openSettings) }
+                composable(SETTINGS) { SettingsScreen(ui, vm, onBack = { nav.popBackStack() }) }
             }
         }
     }
